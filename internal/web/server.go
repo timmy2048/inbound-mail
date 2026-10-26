@@ -92,6 +92,7 @@ func (s *Server) Shutdown(ctx context.Context) error { return s.http.Shutdown(ct
 
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /ingest", s.ingest)
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("GET /robots.txt", s.robots)
 	mux.HandleFunc("GET /static/style.css", s.static("style.css", "text/css; charset=utf-8"))
@@ -237,13 +238,13 @@ func (s *Server) checkCSRF(w http.ResponseWriter, r *http.Request) bool {
 }
 
 type Base struct {
-	Title          string
-	CSRF           string
-	Notice         string
-	Error          string
-	Admin          bool
-	RetentionDays  int
-	AttachmentMax  string
+	Title         string
+	CSRF          string
+	Notice        string
+	Error         string
+	Admin         bool
+	RetentionDays int
+	AttachmentMax string
 }
 
 func (s *Server) view(title string) Base {

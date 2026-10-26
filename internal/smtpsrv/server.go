@@ -12,9 +12,8 @@ import (
 
 	"github.com/emersion/go-smtp"
 
-	"laijian/internal/addr"
 	"laijian/internal/config"
-	"laijian/internal/parse"
+	"laijian/internal/deliver"
 	"laijian/internal/store"
 )
 
@@ -99,14 +98,13 @@ func (s *session) Mail(from string, opts *smtp.MailOptions) error {
 }
 
 func (s *session) Rcpt(to string, _ *smtp.RcptOptions) error {
-	address, err := addr.NormalizeEmail(to)
-	if err != nil {
+	mb, err := deliver.Lookup(s.store, to)
+	if errors.Is(err, deliver.ErrBadAddress) {
 		log.Printf("smtp reject remote=%s reason=bad-address", s.remote)
 		return errUnknown
 	}
-	mb, err := s.store.MailboxByAddress(address)
-	if errors.Is(err, store.ErrNotFound) {
-		log.Printf("smtp reject remote=%s recipient=%s", s.remote, address)
+	if errors.Is(err, deliver.ErrUnknownRecipient) {
+		log.Printf("smtp reject remote=%s recipient=%s", s.remote, strings.TrimSpace(to))
 		return errUnknown
 	}
 	if err != nil {
@@ -139,14 +137,14 @@ func (s *session) Data(r io.Reader) error {
 		log.Printf("smtp read remote=%s err=%v", s.remote, err)
 		return errTemporary
 	}
-	parsed := parse.Message(raw, s.from)
 	received := time.Now()
 	for i, id := range s.ids {
-		if _, err := s.store.SaveMessage(id, s.rcpts[i], parsed, received); err != nil {
+		stored, err := deliver.StoreRaw(s.store, id, s.rcpts[i], s.from, raw, received)
+		if err != nil {
 			log.Printf("smtp store mailbox_id=%d err=%v", id, err)
 			return errTemporary
 		}
-		log.Printf("smtp accepted mailbox_id=%d bytes=%d attachments=%d", id, len(raw), len(parsed.Attachments))
+		log.Printf("smtp accepted mailbox_id=%d bytes=%d attachments=%d", id, len(raw), stored.Attachments)
 	}
 	return nil
 }

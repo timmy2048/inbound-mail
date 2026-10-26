@@ -16,6 +16,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("SERVER_PUBLIC_IP", "")
 	t.Setenv("SMTP_TLS_CERT", "")
 	t.Setenv("SMTP_TLS_KEY", "")
+	t.Setenv("INGEST_TOKEN", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -35,6 +36,25 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if got := cfg.MagicLink("abc"); got != "http://127.0.0.1:8787/m/abc" {
 		t.Fatal(got)
+	}
+	if cfg.IngestEnabled() {
+		t.Fatal("empty INGEST_TOKEN should disable ingest")
+	}
+}
+
+func TestIngestTokenTrimmed(t *testing.T) {
+	t.Setenv("ADMIN_PASSWORD", "secret")
+	t.Setenv("RETENTION_DAYS", "")
+	t.Setenv("PUBLIC_BASE_URL", "")
+	t.Setenv("SMTP_TLS_CERT", "")
+	t.Setenv("SMTP_TLS_KEY", "")
+	t.Setenv("INGEST_TOKEN", "  abcdefghijklmnop  ")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.IngestToken != "abcdefghijklmnop" || !cfg.IngestEnabled() {
+		t.Fatalf("token %q enabled %v", cfg.IngestToken, cfg.IngestEnabled())
 	}
 }
 

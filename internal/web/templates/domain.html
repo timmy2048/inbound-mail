@@ -6,6 +6,7 @@
 
 <section aria-labelledby="dns-heading">
   <h2 id="dns-heading">把收信指到这台服务器</h2>
+  <p>下面是公网 25 端口进得来时的做法。这台机器如果收不到入站 TCP 25（Oracle Cloud 就是这样），不要把 MX 指到 <code>mail.{{.Domain.Name}}</code>。MX 交给 Cloudflare Email Routing，由 Worker 把信 POST 到 <code>/ingest</code>。步骤在 README「公网 25 端口进不来」。</p>
   {{if .DNS.IPWarning}}<div class="banner warn" role="status">{{.DNS.IPWarning}}</div>{{end}}
   <p>{{.DNS.Note}}</p>
   <p class="hint">SPF、DKIM、DMARC 这版不配。只收信时不是必须，以后若要拒收伪造来源再补。</p>

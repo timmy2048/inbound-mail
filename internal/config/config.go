@@ -32,20 +32,23 @@ type Config struct {
 	SMTPTLSCert        string
 	SMTPTLSKey         string
 	SecureCookie       bool
+	// IngestToken authenticates POST /ingest. Empty disables the endpoint.
+	IngestToken string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:           getenv("HTTP_ADDR", ":8080"),
-		SMTPAddr:           getenv("SMTP_ADDR", ":2525"),
-		SMTPDomain:         getenv("SMTP_DOMAIN", "localhost"),
-		PublicBaseURL:      getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8787"),
-		AdminPassword:      os.Getenv("ADMIN_PASSWORD"),
-		ServerPublicIP:     getenv("SERVER_PUBLIC_IP", "203.0.113.10"),
-		SMTPTLSCert:        strings.TrimSpace(os.Getenv("SMTP_TLS_CERT")),
-		SMTPTLSKey:         strings.TrimSpace(os.Getenv("SMTP_TLS_KEY")),
-		MailDataDir:        getenv("MAIL_DATA_DIR", "./data"),
-		DatabasePath:       strings.TrimSpace(os.Getenv("DATABASE_PATH")),
+		HTTPAddr:       getenv("HTTP_ADDR", ":8080"),
+		SMTPAddr:       getenv("SMTP_ADDR", ":2525"),
+		SMTPDomain:     getenv("SMTP_DOMAIN", "localhost"),
+		PublicBaseURL:  getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8787"),
+		AdminPassword:  os.Getenv("ADMIN_PASSWORD"),
+		ServerPublicIP: getenv("SERVER_PUBLIC_IP", "203.0.113.10"),
+		SMTPTLSCert:    strings.TrimSpace(os.Getenv("SMTP_TLS_CERT")),
+		SMTPTLSKey:     strings.TrimSpace(os.Getenv("SMTP_TLS_KEY")),
+		MailDataDir:    getenv("MAIL_DATA_DIR", "./data"),
+		DatabasePath:   strings.TrimSpace(os.Getenv("DATABASE_PATH")),
+		IngestToken:    strings.TrimSpace(os.Getenv("INGEST_TOKEN")),
 	}
 
 	if strings.TrimSpace(cfg.AdminPassword) == "" {
@@ -102,6 +105,11 @@ func Load() (Config, error) {
 		return Config{}, errors.New("SMTP_DOMAIN 不能为空")
 	}
 	return cfg, nil
+}
+
+// IngestEnabled reports whether POST /ingest should accept mail.
+func (c Config) IngestEnabled() bool {
+	return c.IngestToken != ""
 }
 
 // MagicLink is the permanent inbox URL for a mailbox token.
