@@ -70,6 +70,9 @@ go run ./cmd/laijian
 | `SERVER_PUBLIC_IP` | `203.0.113.10` | 写进 DNS 说明的公网 IPv4 |
 | `SMTP_TLS_CERT` / `SMTP_TLS_KEY` | 空 | 两个都填才广告 STARTTLS |
 | `INGEST_TOKEN` | 空 | `POST /ingest` 的共享密钥。留空则这个地址不存在 |
+| `CLOUDFLARE_API_TOKEN` | 空 | 后台「验证 Worker」读取 Email Routing 规则。留空则只检查诊断地址 |
+| `CLOUDFLARE_ACCOUNT_ID` | 空 | 可选。Zone 较多时用来收窄查找 |
+| `WORKER_DIAG_URL` | 已部署的 `/_diag` | Worker 诊断地址。留空用默认 |
 
 生成 bcrypt（密码不要放在命令行参数里）：
 
@@ -146,7 +149,7 @@ X-Envelope-From: 信封发件人
 
 ## 添加域名
 
-后台「添加域名」。下一页是收信 DNS，分两条，不要混在一起。后台的「验证 DNS」核对 Cloudflare 的三条 MX，「验证自建 DNS」核对实验室那条。
+后台「添加域名」。下一页是收信 DNS，分两条，不要混在一起。推荐路径默认只放两个按钮：「验证 DNS」核对 Cloudflare 的三条 MX，「验证 Worker」核对全收是否指向 `laijian-cf-email-ingest`，并访问 Worker 诊断地址。MX 清单收在「需要手动核对时展开」里。「验证自建 DNS」核对实验室那条。
 
 ### 推荐：Cloudflare Email Routing
 
@@ -158,7 +161,7 @@ X-Envelope-From: 信封发件人
 
 优先级由 Cloudflare 按域名分配，不必抄固定数字。名称填 `@`。删掉指向别处的 MX。OCI 等环境会拦截 25 端口，不要把 MX 指到 VPS。
 
-打开 Email Routing 后点后台的「验证 DNS」。三条都在、且没有其他 MX，才算通过。可以随时再查。
+打开 Email Routing 后点后台的「验证 DNS」。三条都在、且没有其他 MX，才算通过。再点「验证 Worker」。设置了 `CLOUDFLARE_API_TOKEN` 时，它会看这个 Zone 的全收（或 matcher 为 all 的规则）是否启用，并且动作是 Worker、目标名字里包含 `laijian-cf-email-ingest`。同时请求诊断地址（默认 `https://laijian-cf-email-ingest.timmy2048.workers.dev/_diag`，可用 `WORKER_DIAG_URL` 改）。Token 留空时仍检查诊断地址，并说明路由规则检查需要 `CLOUDFLARE_API_TOKEN`。可以随时再查。页面不显示 Token。
 
 这版只收信，不在这里配 SPF、DKIM、DMARC。Email Routing 若自己写入 SPF，留着即可。
 

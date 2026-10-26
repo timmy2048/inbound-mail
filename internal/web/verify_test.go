@@ -67,6 +67,7 @@ func TestAdminCanVerifyDNS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	srv.SetWorkerVerifier(forbidWorker{t})
 	idle := &countingResolver{}
 	srv.SetDNSResolver(idle)
 	webSrv := httptest.NewServer(srv.Handler())
@@ -105,6 +106,10 @@ func TestAdminCanVerifyDNS(t *testing.T) {
 		`name="path" value="cloudflare"`,
 		`name="path" value="smtp"`,
 		"验证 DNS",
+		"验证 Worker",
+		"需要手动核对时展开",
+		"在 Cloudflare 开启电子邮件路由",
+		"路由规则检查需要 CLOUDFLARE_API_TOKEN",
 		"验证自建 DNS",
 		`data-copy="MX @ route1.mx.cloudflare.net"`,
 		"不要把 MX 指到这台机器",

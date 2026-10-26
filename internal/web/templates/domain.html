@@ -6,41 +6,59 @@
 
 <section aria-labelledby="dns-heading" class="dns">
   <h2 id="dns-heading">收信 DNS</h2>
-  <p>配好记录后点验证。可以随时再查一次。只向本页生成的地址发信。</p>
+  <p>可以随时再查一次。只向本页生成的地址发信。</p>
   <p class="hint">Worker 把信 POST 到 <code>mail.{{.Domain.Name}}:8787</code> 的 <code>/ingest</code>。MX 不要指到这个主机。</p>
 
   <article class="path path-recommended" aria-labelledby="dns-cf">
     <h3 id="dns-cf">{{.Guide.Recommended.Title}}</h3>
-    <p>{{.Guide.Recommended.Summary}}</p>
-    <ol class="steps">
-      {{range .Guide.Recommended.Steps}}<li>{{.}}</li>{{end}}
-    </ol>
-    <ul class="records" aria-label="{{.Guide.Recommended.RecordsA}}">
-      {{range .Guide.Recommended.Records}}
-      <li class="record-row">
-        <div>
-          <div class="record-main">
-            <span class="rtype">{{.Type}}</span>
-            <code class="rvalue">{{.Value}}</code>
-          </div>
-          {{if .Meta}}<p class="record-meta hint">{{.Meta}}</p>{{end}}
-        </div>
-        {{if .Copy}}<button type="button" class="secondary" data-copy="{{.Copy}}" aria-label="复制 {{.Copy}}">复制</button>{{end}}
-      </li>
-      {{end}}
-    </ul>
-    {{if .Guide.Recommended.CopyAll}}
-    <div class="path-actions">
-      <button type="button" class="secondary" data-copy="{{.Guide.Recommended.CopyAll}}">复制全部 MX</button>
-    </div>
-    {{end}}
-    <p class="hint">{{.Guide.Recommended.Note}}</p>
+    <p>在 Cloudflare 开启电子邮件路由；MX 由 CF 自动写入，点「验证 DNS」或「验证 Worker」。</p>
     {{if and .Verify (eq .Verify.Path "cloudflare")}}{{template "dns-check" .Verify}}{{end}}
-    <form class="path-actions" method="post" action="/admin/domains/{{.Domain.ID}}/verify">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <input type="hidden" name="path" value="cloudflare">
-      <button type="submit">验证 DNS</button>
-    </form>
+    {{if .Worker}}{{template "dns-check" .Worker}}{{end}}
+    <div class="path-actions">
+      <form method="post" action="/admin/domains/{{.Domain.ID}}/verify">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <input type="hidden" name="path" value="cloudflare">
+        <button type="submit">验证 DNS</button>
+      </form>
+      <form method="post" action="/admin/domains/{{.Domain.ID}}/verify-worker">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <button type="submit">验证 Worker</button>
+      </form>
+    </div>
+    {{if .RoutingConfigured}}
+    <p class="hint">「验证 Worker」核对全收是否指向 laijian-cf-email-ingest，并访问诊断地址。</p>
+    {{else}}
+    <p class="hint">路由规则检查需要 CLOUDFLARE_API_TOKEN。现在只会检查 Worker 诊断地址。</p>
+    {{end}}
+    <details class="manual">
+      <summary>需要手动核对时展开</summary>
+      <div class="path-body">
+        <p>{{.Guide.Recommended.Summary}}</p>
+        <ol class="steps">
+          {{range .Guide.Recommended.Steps}}<li>{{.}}</li>{{end}}
+        </ol>
+        <ul class="records" aria-label="{{.Guide.Recommended.RecordsA}}">
+          {{range .Guide.Recommended.Records}}
+          <li class="record-row">
+            <div>
+              <div class="record-main">
+                <span class="rtype">{{.Type}}</span>
+                <code class="rvalue">{{.Value}}</code>
+              </div>
+              {{if .Meta}}<p class="record-meta hint">{{.Meta}}</p>{{end}}
+            </div>
+            {{if .Copy}}<button type="button" class="secondary" data-copy="{{.Copy}}" aria-label="复制 {{.Copy}}">复制</button>{{end}}
+          </li>
+          {{end}}
+        </ul>
+        {{if .Guide.Recommended.CopyAll}}
+        <div class="path-actions">
+          <button type="button" class="secondary" data-copy="{{.Guide.Recommended.CopyAll}}">复制全部 MX</button>
+        </div>
+        {{end}}
+        <p class="hint">{{.Guide.Recommended.Note}}</p>
+      </div>
+    </details>
   </article>
 
   <details class="path path-optional"{{if and .Verify (eq .Verify.Path "smtp")}} open{{end}}>
