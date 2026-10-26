@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"laijian/internal/addr"
@@ -158,13 +159,15 @@ type MailboxRow struct {
 
 type DomainView struct {
 	Base
-	Domain    store.Domain
-	Created   string
-	RFC       string
-	Mailboxes []MailboxRow
-	Guide     dnsinfo.Guide
-	Verify    *DNSCheckView
-	Count     string
+	Domain            store.Domain
+	Created           string
+	RFC               string
+	Mailboxes         []MailboxRow
+	Guide             dnsinfo.Guide
+	Verify            *DNSCheckView
+	Worker            *WorkerCheckView
+	RoutingConfigured bool
+	Count             string
 }
 
 func (s *Server) domainPage(w http.ResponseWriter, r *http.Request) {
@@ -197,13 +200,15 @@ func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, err
 		count = "10"
 	}
 	view := DomainView{
-		Base:    s.adminView(d.Name, r),
-		Domain:  d,
-		Created: displayTime(d.CreatedAt),
-		RFC:     rfc3339(d.CreatedAt),
-		Guide:   dnsinfo.GuideFor(d.Name, s.cfg.ServerPublicIP),
-		Verify:  s.dnsCheckFor(r, d.ID),
-		Count:   count,
+		Base:              s.adminView(d.Name, r),
+		Domain:            d,
+		Created:           displayTime(d.CreatedAt),
+		RFC:               rfc3339(d.CreatedAt),
+		Guide:             dnsinfo.GuideFor(d.Name, s.cfg.ServerPublicIP),
+		Verify:            s.dnsCheckFor(r, d.ID),
+		Worker:            s.workerCheckFor(r, d.ID),
+		RoutingConfigured: strings.TrimSpace(s.cfg.CloudflareAPIToken) != "",
+		Count:             count,
 	}
 	view.Error = errMsg
 	view.Domain.MailboxCount = len(boxes)
@@ -270,6 +275,7 @@ func (s *Server) deleteDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.checks.drop(id)
+	s.wchecks.drop(id)
 	log.Printf("admin deleted domain_id=%d", id)
 	http.Redirect(w, r, "/admin?notice=deleted-domain", http.StatusSeeOther)
 }

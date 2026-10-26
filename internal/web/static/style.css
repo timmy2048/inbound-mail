@@ -316,8 +316,10 @@ code { font-size: 0.95em; }
   margin: 0.75rem 0 0;
 }
 
-.path-actions form,
+.path-actions form { margin: 0; }
 form.path-actions { margin: 0.75rem 0 0; }
+
+.manual { margin-top: 0.9rem; }
 
 .banner .check-title { font-weight: 650; margin: 0; }
 .banner p { margin: 0.2rem 0; max-width: none; }
