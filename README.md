@@ -26,7 +26,7 @@
 发件服务器 --SMTP--> Cloudflare Email Routing --Worker--> POST /ingest --> 来件
 ```
 
-两条路用同一套解析和存储。管理员走 `/admin`，持有链接的人走 `/m/{token}`。
+MX 指向 Cloudflare，不指向这台机器。Worker 把信 POST 到 `http://mail.<域名>:8787/ingest`。两条路用同一套解析和存储。管理员走 `/admin`，持有链接的人走 `/m/{token}`。
 
 用内置的 [go-smtp](https://github.com/emersion/go-smtp)，不另跑 maddy 或 Haraka。收件人白名单和网页在同一个进程里，生成地址后立刻能收，不用再同步一份 MTA 配置。这版不发信，也不需要出站队列。反垃圾和证书自动化以后可以加在前面，不必现在拆成两个服务。
 
@@ -83,9 +83,9 @@ printf '%s' '你的密码' | go run ./cmd/hashpw
 
 ## 公网 25 端口进不来
 
-Oracle Cloud 以及一些别的网络会丢掉入站 TCP 25。这种机器收不到公网 SMTP，不要把 MX 指到 VPS 上的 `mail.<域名>`，也不要在安全组里等 25 端口。改用 Cloudflare Email Routing：MX 指到 Cloudflare，Worker 把原文 POST 进来。
+Oracle Cloud 以及一些别的网络会丢掉入站 TCP 25。这种机器收不到公网 SMTP，不要把 MX 指到 VPS 上的 `mail.<域名>`，也不要在安全组里等 25 端口。改用 Cloudflare Email Routing：MX 指到 Cloudflare，Worker 把原文 POST 到 `http://mail.<域名>:8787/ingest`。
 
-实验室或本机如果 25 端口能用，继续用下面的「直接 SMTP」。同一个域名不要两条路一起开。走 Email Routing 时，MX 只能是 Cloudflare 的。
+实验室或本机如果 25 端口能用，用页面上的「可选：自建 SMTP」。同一个域名不要两条路一起开。走 Email Routing 时，MX 只能是 Cloudflare 的。
 
 `INGEST_TOKEN` 留空时，`POST /ingest` 和别的未知地址一样返回 404，信不会进库。设成一长串随机值并重启之后才打开：
 
@@ -126,7 +126,7 @@ X-Envelope-From: 信封发件人
 
 1. 用来件的 `INGEST_TOKEN` 重启服务。确认公网能访问 HTTP（compose 映射的是宿主机 `8787`），不是 TCP 25。能加 HTTPS 反向代理就用 HTTPS，避免密钥走明文。
 2. 后台打开 [Email Routing](https://dash.cloudflare.com/?to=/:account/email-service/routing)：**Compute** → **Email Service** → **Email Routing** → **Onboard Domain**，选域名（示例是 `richrich.cc.cd`）。让 Cloudflare 写入它的 MX（`route1.mx.cloudflare.net`、`route2`、`route3`）。删掉指向 `mail.<域名>` 或这台 VPS 的 MX。
-3. 在 `workers/cf-email-ingest` 里登录，把两个值写成 secret。`INGEST_URL` 是第 1 步的公网地址，例如 `https://<你的主机>/ingest`，不要写 `127.0.0.1`。`INGEST_TOKEN` 和来件相同。两个都不要写进文件再提交。
+3. 在 `workers/cf-email-ingest` 里登录，把两个值写成 secret。`INGEST_URL` 是 `http://mail.<域名>:8787/ingest`（示例 `http://mail.richrich.cc.cd:8787/ingest`），不要写 `127.0.0.1`。`INGEST_TOKEN` 和来件相同。两个都不要写进文件再提交。
 
    ```bash
    cd workers/cf-email-ingest
@@ -142,26 +142,36 @@ X-Envelope-From: 信封发件人
    - 或者在 `wrangler.jsonc` 加上 `"addresses": ["*@richrich.cc.cd"]`（根域 catch-all，Wrangler 4.113 及以上），再 `npx wrangler deploy`。Wrangler 会先显示将要改的规则。
 5. 后台生成一个地址，从外面发一封信，打开查看链接确认收进了。未生成的地址应被拒收。
 
-环境变量就两个，都用 `wrangler secret put` 写入，不进仓库：`INGEST_URL`（来件的 `POST /ingest` 公网地址）、`INGEST_TOKEN`（和来件相同的共享密钥）。
+环境变量就两个，都用 `wrangler secret put` 写入，不进仓库：`INGEST_URL`（`http://mail.<域名>:8787/ingest`）、`INGEST_TOKEN`（和来件相同的共享密钥）。
 
-## 直接 SMTP（25 端口可用时）
+## 添加域名
 
-后台「添加域名」。添加之后的页面就是这条路径的 DNS 清单。以 `richrich.cc.cd` 为例，其他域名同样填，只是把名字换掉。25 端口进不来的机器跳过这一节，用上一节。
+后台「添加域名」。下一页是收信 DNS，分两条，不要混在一起。后台的「验证 DNS」核对 Cloudflare 的三条 MX，「验证自建 DNS」核对实验室那条。
 
-1. **MX**
-   - 名称：`@`（有的面板要填 `richrich.cc.cd`）
-   - 邮件主机：`mail.richrich.cc.cd`
-   - 优先级：`10`
-   - 代理：**仅 DNS（灰云）**。不要打开橙色云。SMTP 不能走 Cloudflare 的 HTTP 代理。
-2. **A**
-   - 名称：`mail`（完整是 `mail.richrich.cc.cd`）
-   - IPv4：`SERVER_PUBLIC_IP`，也就是这台机器的公网地址
-   - 代理：**仅 DNS（灰云）**
-3. 解析生效后，只向生成出来的地址发信。
+### 推荐：Cloudflare Email Routing
 
-`203.0.113.10` 是文档地址，后台会提示它收不到公网的信。上机前改成 VPS 的公网 IPv4 并重启。本地注入不依赖这条记录。
+生产环境走这条。示例域名 `richrich.cc.cd` 的 DNS 在 Cloudflare，MX 是：
 
-SPF、DKIM、DMARC 这版不配。只收信时不是必须；以后若要拒收伪造来源，再补。
+- `route1.mx.cloudflare.net`
+- `route2.mx.cloudflare.net`
+- `route3.mx.cloudflare.net`
+
+优先级由 Cloudflare 按域名分配，不必抄固定数字。名称填 `@`。删掉指向别处的 MX。OCI 等环境会拦截 25 端口，不要把 MX 指到 VPS。
+
+打开 Email Routing 后点后台的「验证 DNS」。三条都在、且没有其他 MX，才算通过。可以随时再查。
+
+这版只收信，不在这里配 SPF、DKIM、DMARC。Email Routing 若自己写入 SPF，留着即可。
+
+### 可选：自建 SMTP（实验室）
+
+只在公网能连上 25 端口时使用。本地注入不依赖这些记录。
+
+1. **MX** `@` → `mail.<域名>`，优先级 `10`，仅 DNS（灰云）。
+2. **A** `mail` → `SERVER_PUBLIC_IP`，仅 DNS（灰云）。
+
+`203.0.113.10` 是文档地址，后台会提示它收不到公网的信。上机前改成 VPS 的公网 IPv4 并重启。
+
+解析生效后，只向生成出来的地址发信。后台的「验证自建 DNS」会核对 MX 和 A。
 
 ## 邮箱、链接、CSV
 
@@ -218,4 +228,4 @@ cd workers/cf-email-ingest && npm test
 
 上备用 VPS、而且那台机器的 25 端口进得来时，还是这份 compose：把端口改成 `"25:2525"`（容器内仍监听 2525，不必 root），`SERVER_PUBLIC_IP` 改成公网 IPv4，`PUBLIC_BASE_URL` 改成实际访问地址，防火墙放行 25。需要 STARTTLS 时挂上证书文件并设置 `SMTP_TLS_CERT` 和 `SMTP_TLS_KEY`。HTTPS 可以以后在前面加一层反向代理，本服务不签发证书。
 
-25 端口进不来的机器不要做上面的端口映射。设 `INGEST_TOKEN`，按「公网 25 端口进不来」把 MX 交给 Cloudflare。
+25 端口进不来的机器不要做上面的端口映射。设 `INGEST_TOKEN`，按「公网 25 端口进不来」把 MX 交给 Cloudflare。Worker 的地址是 `http://mail.<域名>:8787/ingest`。

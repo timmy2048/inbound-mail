@@ -4,40 +4,81 @@
 <h1 class="domain-name">{{.Domain.Name}}</h1>
 <p>已有 {{.Domain.MailboxCount}} 个邮箱。添加于 <time datetime="{{.RFC}}">{{.Created}}</time>（北京时间）。</p>
 
-<section aria-labelledby="dns-heading">
-  <h2 id="dns-heading">把收信指到这台服务器</h2>
-  <p>下面是公网 25 端口进得来时的做法。这台机器如果收不到入站 TCP 25（Oracle Cloud 就是这样），不要把 MX 指到 <code>mail.{{.Domain.Name}}</code>。MX 交给 Cloudflare Email Routing，由 Worker 把信 POST 到 <code>/ingest</code>。步骤在 README「公网 25 端口进不来」。</p>
-  {{if .DNS.IPWarning}}<div class="banner warn" role="status">{{.DNS.IPWarning}}</div>{{end}}
-  <p>{{.DNS.Note}}</p>
-  <p class="hint">SPF、DKIM、DMARC 这版不配。只收信时不是必须，以后若要拒收伪造来源再补。</p>
-  <ol class="steps">
-    <li>
-      <h3>MX 记录</h3>
-      <dl class="record">
-        <dt>类型</dt><dd>MX</dd>
-        <dt>名称</dt><dd><code>@</code> <span class="hint">有的面板要填 {{.Domain.Name}} 本身</span></dd>
-        <dt>邮件主机</dt><dd><code>{{.DNS.MXHost}}</code></dd>
-        <dt>优先级</dt><dd><code>10</code></dd>
-        <dt>代理</dt><dd>仅 DNS（灰云）。不要打开橙色代理。</dd>
-      </dl>
-    </li>
-    <li>
-      <h3>A 记录</h3>
-      <dl class="record">
-        <dt>类型</dt><dd>A</dd>
-        <dt>名称</dt><dd><code>mail</code></dd>
-        <dt>完整名称</dt><dd><code>{{.DNS.MXHost}}</code></dd>
-        <dt>IPv4</dt><dd><code>{{.DNS.IP}}</code></dd>
-        <dt>代理</dt><dd>仅 DNS（灰云）。不要打开橙色代理。</dd>
-      </dl>
-    </li>
-    <li>
-      <h3>开始收信</h3>
-      <p>解析生效后，只向本页生成的地址发信。没有生成过的收件人，服务器直接拒收。</p>
-    </li>
-  </ol>
-  <h3>可复制的清单</h3>
-  <pre class="dns-plain">{{.DNS.Plain}}</pre>
+<section aria-labelledby="dns-heading" class="dns">
+  <h2 id="dns-heading">收信 DNS</h2>
+  <p>配好记录后点验证。可以随时再查一次。只向本页生成的地址发信。</p>
+  <p class="hint">Worker 把信 POST 到 <code>mail.{{.Domain.Name}}:8787</code> 的 <code>/ingest</code>。MX 不要指到这个主机。</p>
+
+  <article class="path path-recommended" aria-labelledby="dns-cf">
+    <h3 id="dns-cf">{{.Guide.Recommended.Title}}</h3>
+    <p>{{.Guide.Recommended.Summary}}</p>
+    <ol class="steps">
+      {{range .Guide.Recommended.Steps}}<li>{{.}}</li>{{end}}
+    </ol>
+    <ul class="records" aria-label="{{.Guide.Recommended.RecordsA}}">
+      {{range .Guide.Recommended.Records}}
+      <li class="record-row">
+        <div>
+          <div class="record-main">
+            <span class="rtype">{{.Type}}</span>
+            <code class="rvalue">{{.Value}}</code>
+          </div>
+          {{if .Meta}}<p class="record-meta hint">{{.Meta}}</p>{{end}}
+        </div>
+        {{if .Copy}}<button type="button" class="secondary" data-copy="{{.Copy}}" aria-label="复制 {{.Copy}}">复制</button>{{end}}
+      </li>
+      {{end}}
+    </ul>
+    {{if .Guide.Recommended.CopyAll}}
+    <div class="path-actions">
+      <button type="button" class="secondary" data-copy="{{.Guide.Recommended.CopyAll}}">复制全部 MX</button>
+    </div>
+    {{end}}
+    <p class="hint">{{.Guide.Recommended.Note}}</p>
+    {{if and .Verify (eq .Verify.Path "cloudflare")}}{{template "dns-check" .Verify}}{{end}}
+    <form class="path-actions" method="post" action="/admin/domains/{{.Domain.ID}}/verify">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <input type="hidden" name="path" value="cloudflare">
+      <button type="submit">验证 DNS</button>
+    </form>
+  </article>
+
+  <details class="path path-optional"{{if and .Verify (eq .Verify.Path "smtp")}} open{{end}}>
+    <summary>{{.Guide.Optional.Title}}</summary>
+    <div class="path-body">
+      <p>{{.Guide.Optional.Summary}}</p>
+      {{if .Guide.Optional.Warning}}<div class="banner warn" role="status">{{.Guide.Optional.Warning}}</div>{{end}}
+      <ol class="steps">
+        {{range .Guide.Optional.Steps}}<li>{{.}}</li>{{end}}
+      </ol>
+      <ul class="records" aria-label="{{.Guide.Optional.RecordsA}}">
+        {{range .Guide.Optional.Records}}
+        <li class="record-row">
+          <div>
+            <div class="record-main">
+              <span class="rtype">{{.Type}}</span>
+              <code class="rvalue">{{.Value}}</code>
+            </div>
+            {{if .Meta}}<p class="record-meta hint">{{.Meta}}</p>{{end}}
+          </div>
+          {{if .Copy}}<button type="button" class="secondary" data-copy="{{.Copy}}" aria-label="复制 {{.Copy}}">复制</button>{{end}}
+        </li>
+        {{end}}
+      </ul>
+      {{if .Guide.Optional.CopyAll}}
+      <div class="path-actions">
+        <button type="button" class="secondary" data-copy="{{.Guide.Optional.CopyAll}}">复制全部记录</button>
+      </div>
+      {{end}}
+      <p class="hint">{{.Guide.Optional.Note}}</p>
+      {{if and .Verify (eq .Verify.Path "smtp")}}{{template "dns-check" .Verify}}{{end}}
+      <form class="path-actions" method="post" action="/admin/domains/{{.Domain.ID}}/verify">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <input type="hidden" name="path" value="smtp">
+        <button type="submit" class="secondary">验证自建 DNS</button>
+      </form>
+    </div>
+  </details>
 </section>
 
 <section aria-labelledby="gen-heading">

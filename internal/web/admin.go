@@ -162,7 +162,8 @@ type DomainView struct {
 	Created   string
 	RFC       string
 	Mailboxes []MailboxRow
-	DNS       dnsinfo.Instructions
+	Guide     dnsinfo.Guide
+	Verify    *DNSCheckView
 	Count     string
 }
 
@@ -200,7 +201,8 @@ func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, err
 		Domain:  d,
 		Created: displayTime(d.CreatedAt),
 		RFC:     rfc3339(d.CreatedAt),
-		DNS:     dnsinfo.For(d.Name, s.cfg.ServerPublicIP),
+		Guide:   dnsinfo.GuideFor(d.Name, s.cfg.ServerPublicIP),
+		Verify:  s.dnsCheckFor(r, d.ID),
 		Count:   count,
 	}
 	view.Error = errMsg
@@ -267,6 +269,7 @@ func (s *Server) deleteDomain(w http.ResponseWriter, r *http.Request) {
 		s.problem(w, http.StatusInternalServerError, "暂时没能删除域名。")
 		return
 	}
+	s.checks.drop(id)
 	log.Printf("admin deleted domain_id=%d", id)
 	http.Redirect(w, r, "/admin?notice=deleted-domain", http.StatusSeeOther)
 }

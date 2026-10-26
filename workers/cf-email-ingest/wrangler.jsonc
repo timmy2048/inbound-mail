@@ -17,7 +17,7 @@
   },
   // Both values are secrets so neither the token nor the server URL is committed.
   // INGEST_URL is the public POST /ingest address, for example
-  // https://mail.example.com/ingest. The Worker runs on Cloudflare, so
+  // http://mail.example.com:8787/ingest. The Worker runs on Cloudflare, so
   // 127.0.0.1 and a private address will not work.
   //   printf '%s' "$INGEST_URL" | npx wrangler secret put INGEST_URL
   //   printf '%s' "$INGEST_TOKEN" | npx wrangler secret put INGEST_TOKEN
