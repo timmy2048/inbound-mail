@@ -123,7 +123,16 @@ func TestMessagePageAutolinksText(t *testing.T) {
 	t.Cleanup(webSrv.Close)
 
 	pageURL := webSrv.URL + "/m/" + boxes[0].Token + "/messages/" + strconv.FormatInt(id, 10)
-	status, body := get(t, http.DefaultClient, pageURL)
+	res, err := http.Get(pageURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, body := res.StatusCode, string(raw)
 	if status != http.StatusOK {
 		t.Fatalf("status %d", status)
 	}
@@ -143,7 +152,7 @@ func TestMessagePageAutolinksText(t *testing.T) {
 		t.Fatal("script tag was not escaped")
 	}
 
-	res, err := http.Get(pageURL + "/html")
+	res, err = http.Get(pageURL + "/html")
 	if err != nil {
 		t.Fatal(err)
 	}

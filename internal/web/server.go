@@ -15,10 +15,8 @@ import (
 	"time"
 
 	"laijian/internal/config"
-	"laijian/internal/dnsinfo"
 	"laijian/internal/generate"
 	"laijian/internal/store"
-	"laijian/internal/workercheck"
 )
 
 //go:embed templates/*.html static/*
@@ -37,19 +35,13 @@ const ctxCSRF ctxKey = 1
 
 // Server serves the admin UI and magic-link inboxes.
 type Server struct {
-	cfg      config.Config
-	store    *store.Store
-	tmpl     *template.Template
-	files    map[string][]byte
-	http     *http.Server
-	limit    *limiter
-	handler  http.Handler
-	dnsMu    sync.RWMutex
-	dns      dnsinfo.Resolver
-	checks   dnsChecks
-	workerMu sync.RWMutex
-	worker   workerVerifier
-	wchecks  workerChecks
+	cfg     config.Config
+	store   *store.Store
+	tmpl    *template.Template
+	files   map[string][]byte
+	http    *http.Server
+	limit   *limiter
+	handler http.Handler
 }
 
 func New(cfg config.Config, st *store.Store) (*Server, error) {
@@ -78,11 +70,6 @@ func New(cfg config.Config, st *store.Store) (*Server, error) {
 		tmpl:  tmpl,
 		files: files,
 		limit: newLimiter(),
-		worker: workercheck.Service{Config: workercheck.Config{
-			Token:     cfg.CloudflareAPIToken,
-			AccountID: cfg.CloudflareAccountID,
-			DiagURL:   cfg.WorkerDiagURL,
-		}},
 	}
 	s.http = &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -118,8 +105,6 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /admin", s.requireAdmin(s.domains))
 	mux.HandleFunc("POST /admin/domains", s.requireAdmin(s.createDomain))
 	mux.HandleFunc("GET /admin/domains/{id}", s.requireAdmin(s.domainPage))
-	mux.HandleFunc("POST /admin/domains/{id}/verify", s.requireAdmin(s.verifyDNS))
-	mux.HandleFunc("POST /admin/domains/{id}/verify-worker", s.requireAdmin(s.verifyWorker))
 	mux.HandleFunc("POST /admin/domains/{id}/mailboxes", s.requireAdmin(s.generateMailboxes))
 	mux.HandleFunc("POST /admin/domains/{id}/delete", s.requireAdmin(s.deleteDomain))
 	mux.HandleFunc("GET /admin/domains/{id}/mailboxes.csv", s.requireAdmin(s.exportDomainCSV))

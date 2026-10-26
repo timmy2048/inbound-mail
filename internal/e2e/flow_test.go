@@ -110,32 +110,41 @@ func TestAdminInboxAndInboundSMTP(t *testing.T) {
 		t.Fatalf("add domain status=%d body=%s", status, body)
 	}
 	for _, want := range []string{
-		"收信 DNS",
-		"推荐：Cloudflare Email Routing",
-		"route1.mx.cloudflare.net",
-		"route2.mx.cloudflare.net",
-		"route3.mx.cloudflare.net",
-		"验证 DNS",
-		"验证 Worker",
-		"需要手动核对时展开",
-		"在 Cloudflare 开启电子邮件路由",
-		"可选：自建 SMTP（实验室）",
-		"mail.richrich.cc.cd",
-		"203.0.113.10",
-		"灰云",
-		"不要把 MX 指到这台机器",
+		"richrich.cc.cd",
+		"生成邮箱",
+		"生成随机邮箱",
+		"邮箱和查看链接",
+		"导出这个域名的 CSV",
 	} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("dns page missing %q", want)
+			t.Fatalf("domain page missing %q", want)
 		}
 	}
-	if strings.Contains(body, "把收信指到这台服务器") {
-		t.Fatal("old dns heading still shown")
+	genAt := strings.Index(body, "生成邮箱")
+	for _, gone := range []string{
+		"收信 DNS",
+		"验证 DNS",
+		"验证 Worker",
+		"验证自建 DNS",
+		"需要手动核对时展开",
+		"可选自建 SMTP",
+		"可选：自建 SMTP",
+		"Cloudflare Email Routing",
+		"电子邮件路由",
+		"route1.mx.cloudflare.net",
+		"/ingest",
+		"本地注入",
+		"灰云",
+		"CLOUDFLARE_API_TOKEN",
+		"WORKER_DIAG",
+		"把收信指到这台服务器",
+	} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("domain page still shows %q", gone)
+		}
 	}
-	cfAt := strings.Index(body, "推荐：Cloudflare Email Routing")
-	selfAt := strings.Index(body, "可选：自建 SMTP（实验室）")
-	if cfAt < 0 || selfAt < 0 || cfAt > selfAt {
-		t.Fatalf("path order cf=%d self=%d", cfAt, selfAt)
+	if genAt < 0 || strings.Index(body, "邮箱和查看链接") < genAt {
+		t.Fatal("mailbox list should follow generate")
 	}
 	csrf = mustCSRF(t, body)
 	domainPath := regexp.MustCompile(`/admin/domains/\d+`).FindString(body)
