@@ -56,11 +56,6 @@ func main() {
 	} else {
 		log.Printf("http ingest disabled (INGEST_TOKEN empty)")
 	}
-	if cfg.CloudflareAPIToken == "" {
-		log.Printf("worker routing check disabled (CLOUDFLARE_API_TOKEN empty)")
-	} else {
-		log.Printf("worker routing check enabled")
-	}
 	log.Printf("smtp listening on %s (inbound only)", cfg.SMTPAddr)
 	log.Printf("public base %s", cfg.PublicBaseURL)
 	log.Printf("retention %d days, attachment max %d bytes", cfg.RetentionDays, cfg.AttachmentMaxBytes)

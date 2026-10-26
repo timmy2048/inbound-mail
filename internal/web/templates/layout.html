@@ -40,24 +40,6 @@
 {{if .Notice}}<div class="banner ok" role="status">{{.Notice}}</div>{{end}}
 {{end}}
 
-{{define "dns-check"}}
-<div id="dns-check" tabindex="-1" class="banner {{.Tone}}" role="status">
-  <p class="check-title">{{.Headline}}</p>
-  <p>{{.Summary}}</p>
-  {{if .Findings}}
-  <ul class="findings">
-    {{range .Findings}}
-    <li>
-      <span class="mark {{if .OK}}mark-ok{{else}}mark-bad{{end}}">{{if .OK}}通过{{else}}未通过{{end}}</span>
-      <span>{{.Title}}{{if .Detail}}：{{.Detail}}{{end}}</span>
-    </li>
-    {{end}}
-  </ul>
-  {{end}}
-  {{if .Checked}}<p class="check-time">检查于 <time datetime="{{.RFC}}">{{.Checked}}</time>（北京时间）</p>{{end}}
-</div>
-{{end}}
-
 {{define "foot"}}
 </main>
 <footer class="colophon">

@@ -67,12 +67,9 @@ go run ./cmd/laijian
 | `MESSAGE_MAX_BYTES` | `8388608` | 整封信的 SMTP 上限，超出的拒收 |
 | `MAIL_DATA_DIR` | `./data` | 附件目录 |
 | `DATABASE_PATH` | `$MAIL_DATA_DIR/mail.db` | SQLite 文件 |
-| `SERVER_PUBLIC_IP` | `203.0.113.10` | 写进 DNS 说明的公网 IPv4 |
+| `SERVER_PUBLIC_IP` | `203.0.113.10` | 实验室自建收信时 A 记录用的公网 IPv4。后台页面不显示 |
 | `SMTP_TLS_CERT` / `SMTP_TLS_KEY` | 空 | 两个都填才广告 STARTTLS |
 | `INGEST_TOKEN` | 空 | `POST /ingest` 的共享密钥。留空则这个地址不存在 |
-| `CLOUDFLARE_API_TOKEN` | 空 | 后台「验证 Worker」读取 Email Routing 规则。留空则只检查诊断地址 |
-| `CLOUDFLARE_ACCOUNT_ID` | 空 | 可选。Zone 较多时用来收窄查找 |
-| `WORKER_DIAG_URL` | 已部署的 `/_diag` | Worker 诊断地址。留空用默认 |
 
 生成 bcrypt（密码不要放在命令行参数里）：
 
@@ -88,7 +85,7 @@ printf '%s' '你的密码' | go run ./cmd/hashpw
 
 Oracle Cloud 以及一些别的网络会丢掉入站 TCP 25。这种机器收不到公网 SMTP，不要把 MX 指到 VPS 上的 `mail.<域名>`，也不要在安全组里等 25 端口。改用 Cloudflare Email Routing：MX 指到 Cloudflare，Worker 把原文 POST 到 `http://mail.<域名>:8787/ingest`。
 
-实验室或本机如果 25 端口能用，用页面上的「可选：自建 SMTP」。同一个域名不要两条路一起开。走 Email Routing 时，MX 只能是 Cloudflare 的。
+实验室或本机如果 25 端口能用，可以把 MX 指到这台机器。同一个域名不要和 Email Routing 一起开。走 Email Routing 时，MX 只能是 Cloudflare 的。后台不展示这些记录。
 
 `INGEST_TOKEN` 留空时，`POST /ingest` 和别的未知地址一样返回 404，信不会进库。设成一长串随机值并重启之后才打开：
 
@@ -149,9 +146,9 @@ X-Envelope-From: 信封发件人
 
 ## 添加域名
 
-后台「添加域名」。下一页是收信 DNS，分两条，不要混在一起。推荐路径默认只放两个按钮：「验证 DNS」核对 Cloudflare 的三条 MX，「验证 Worker」核对全收是否指向 `laijian-cf-email-ingest`，并访问 Worker 诊断地址。MX 清单收在「需要手动核对时展开」里。「验证自建 DNS」核对实验室那条。
+后台「添加域名」。下一页只管理这个域名的邮箱：填写数量、生成地址、复制查看链接、导出 CSV。收信记录不在这个页面上配置。
 
-### 推荐：Cloudflare Email Routing
+### Cloudflare Email Routing
 
 生产环境走这条。示例域名 `richrich.cc.cd` 的 DNS 在 Cloudflare，MX 是：
 
@@ -161,20 +158,18 @@ X-Envelope-From: 信封发件人
 
 优先级由 Cloudflare 按域名分配，不必抄固定数字。名称填 `@`。删掉指向别处的 MX。OCI 等环境会拦截 25 端口，不要把 MX 指到 VPS。
 
-打开 Email Routing 后点后台的「验证 DNS」。三条都在、且没有其他 MX，才算通过。再点「验证 Worker」。设置了 `CLOUDFLARE_API_TOKEN` 时，它会看这个 Zone 的全收（或 matcher 为 all 的规则）是否启用，并且动作是 Worker、目标名字里包含 `laijian-cf-email-ingest`。同时请求诊断地址（默认 `https://laijian-cf-email-ingest.timmy2048.workers.dev/_diag`，可用 `WORKER_DIAG_URL` 改）。Token 留空时仍检查诊断地址，并说明路由规则检查需要 `CLOUDFLARE_API_TOKEN`。可以随时再查。页面不显示 Token。
+这版只收信，不在这里配 SPF、DKIM、DMARC。Email Routing 若自己写入 SPF，留着即可。后台没有 DNS 或 Worker 核对按钮。
 
-这版只收信，不在这里配 SPF、DKIM、DMARC。Email Routing 若自己写入 SPF，留着即可。
-
-### 可选：自建 SMTP（实验室）
+### 自建 SMTP（实验室）
 
 只在公网能连上 25 端口时使用。本地注入不依赖这些记录。
 
 1. **MX** `@` → `mail.<域名>`，优先级 `10`，仅 DNS（灰云）。
 2. **A** `mail` → `SERVER_PUBLIC_IP`，仅 DNS（灰云）。
 
-`203.0.113.10` 是文档地址，后台会提示它收不到公网的信。上机前改成 VPS 的公网 IPv4 并重启。
+`203.0.113.10` 是文档地址，收不到公网的信。上机前把 `SERVER_PUBLIC_IP` 改成 VPS 的公网 IPv4 并重启。
 
-解析生效后，只向生成出来的地址发信。后台的「验证自建 DNS」会核对 MX 和 A。
+解析生效后，只向生成出来的地址发信。
 
 ## 邮箱、链接、CSV
 
@@ -212,7 +207,7 @@ HTML 正文放在沙箱 iframe 里，外链图片不加载，避免发件人用�
 go test ./...
 ```
 
-覆盖这几件事：10 位本地部分的字符集、保留期边界、附件截断、未知收件人拒收、后台添加 `richrich.cc.cd` 后的 DNS 文案、生成邮箱、CSV、魔法链接里能看到注入的信，以及 HTTP ingest（密钥、未知地址、过大、JSON 原文进查看页）。
+覆盖这几件事：10 位本地部分的字符集、保留期边界、附件截断、未知收件人拒收、后台添加 `richrich.cc.cd` 后的邮箱页、生成邮箱、CSV、魔法链接里能看到注入的信，以及 HTTP ingest（密钥、未知地址、过大、JSON 原文进查看页）。
 
 Worker 的投递判断在 `workers/cf-email-ingest`：
 

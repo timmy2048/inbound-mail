@@ -13,11 +13,6 @@ document.addEventListener("submit", (event) => {
   }, 0);
 });
 
-const dnsCheck = document.getElementById("dns-check");
-if (dnsCheck instanceof HTMLElement) {
-  dnsCheck.focus();
-}
-
 document.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;

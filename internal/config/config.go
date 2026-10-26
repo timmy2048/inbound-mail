@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"laijian/internal/workercheck"
 )
 
 const (
@@ -36,36 +34,22 @@ type Config struct {
 	SecureCookie       bool
 	// IngestToken authenticates POST /ingest. Empty disables the endpoint.
 	IngestToken string
-	// CloudflareAPIToken reads Email Routing rules for 验证 Worker.
-	// Empty skips that check; the Worker diag request still runs.
-	CloudflareAPIToken string
-	// CloudflareAccountID optionally narrows the zone lookup.
-	CloudflareAccountID string
-	// WorkerDiagURL is the Worker health endpoint. Empty becomes the deployed default.
-	WorkerDiagURL string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:            getenv("HTTP_ADDR", ":8080"),
-		SMTPAddr:            getenv("SMTP_ADDR", ":2525"),
-		SMTPDomain:          getenv("SMTP_DOMAIN", "localhost"),
-		PublicBaseURL:       getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8787"),
-		AdminPassword:       os.Getenv("ADMIN_PASSWORD"),
-		ServerPublicIP:      getenv("SERVER_PUBLIC_IP", "203.0.113.10"),
-		SMTPTLSCert:         strings.TrimSpace(os.Getenv("SMTP_TLS_CERT")),
-		SMTPTLSKey:          strings.TrimSpace(os.Getenv("SMTP_TLS_KEY")),
-		MailDataDir:         getenv("MAIL_DATA_DIR", "./data"),
-		DatabasePath:        strings.TrimSpace(os.Getenv("DATABASE_PATH")),
-		IngestToken:         strings.TrimSpace(os.Getenv("INGEST_TOKEN")),
-		CloudflareAPIToken:  strings.TrimSpace(os.Getenv("CLOUDFLARE_API_TOKEN")),
-		CloudflareAccountID: strings.TrimSpace(os.Getenv("CLOUDFLARE_ACCOUNT_ID")),
+		HTTPAddr:       getenv("HTTP_ADDR", ":8080"),
+		SMTPAddr:       getenv("SMTP_ADDR", ":2525"),
+		SMTPDomain:     getenv("SMTP_DOMAIN", "localhost"),
+		PublicBaseURL:  getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8787"),
+		AdminPassword:  os.Getenv("ADMIN_PASSWORD"),
+		ServerPublicIP: getenv("SERVER_PUBLIC_IP", "203.0.113.10"),
+		SMTPTLSCert:    strings.TrimSpace(os.Getenv("SMTP_TLS_CERT")),
+		SMTPTLSKey:     strings.TrimSpace(os.Getenv("SMTP_TLS_KEY")),
+		MailDataDir:    getenv("MAIL_DATA_DIR", "./data"),
+		DatabasePath:   strings.TrimSpace(os.Getenv("DATABASE_PATH")),
+		IngestToken:    strings.TrimSpace(os.Getenv("INGEST_TOKEN")),
 	}
-	diagURL, err := workercheck.ParseDiagURL(os.Getenv("WORKER_DIAG_URL"))
-	if err != nil {
-		return Config{}, errors.New("WORKER_DIAG_URL 必须是不带用户名的 http 或 https 地址")
-	}
-	cfg.WorkerDiagURL = diagURL
 
 	if strings.TrimSpace(cfg.AdminPassword) == "" {
 		return Config{}, errors.New("需要设置 ADMIN_PASSWORD（明文或 bcrypt 哈希）。复制 .env.example 为 .env 后填写")

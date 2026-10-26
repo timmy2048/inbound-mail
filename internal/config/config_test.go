@@ -1,10 +1,6 @@
 package config
 
-import (
-	"testing"
-
-	"laijian/internal/workercheck"
-)
+import "testing"
 
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("ADMIN_PASSWORD", "secret")
@@ -21,9 +17,6 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("SMTP_TLS_CERT", "")
 	t.Setenv("SMTP_TLS_KEY", "")
 	t.Setenv("INGEST_TOKEN", "")
-	t.Setenv("CLOUDFLARE_API_TOKEN", "")
-	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "")
-	t.Setenv("WORKER_DIAG_URL", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -46,38 +39,6 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.IngestEnabled() {
 		t.Fatal("empty INGEST_TOKEN should disable ingest")
-	}
-	if cfg.CloudflareAPIToken != "" || cfg.CloudflareAccountID != "" {
-		t.Fatalf("token %q account %q", cfg.CloudflareAPIToken, cfg.CloudflareAccountID)
-	}
-	if cfg.WorkerDiagURL != workercheck.DefaultDiagURL {
-		t.Fatal(cfg.WorkerDiagURL)
-	}
-}
-
-func TestWorkerVerifyConfig(t *testing.T) {
-	t.Setenv("ADMIN_PASSWORD", "secret")
-	t.Setenv("RETENTION_DAYS", "")
-	t.Setenv("PUBLIC_BASE_URL", "")
-	t.Setenv("SMTP_TLS_CERT", "")
-	t.Setenv("SMTP_TLS_KEY", "")
-	t.Setenv("CLOUDFLARE_API_TOKEN", "  tok-value  ")
-	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "  abc  ")
-	t.Setenv("WORKER_DIAG_URL", " https://example.com/_diag?x=1 ")
-	cfg, err := Load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.CloudflareAPIToken != "tok-value" || cfg.CloudflareAccountID != "abc" {
-		t.Fatalf("token %q account %q", cfg.CloudflareAPIToken, cfg.CloudflareAccountID)
-	}
-	if cfg.WorkerDiagURL != "https://example.com/_diag?x=1" {
-		t.Fatal(cfg.WorkerDiagURL)
-	}
-
-	t.Setenv("WORKER_DIAG_URL", "http://user:secret@example.com/_diag")
-	if _, err := Load(); err == nil {
-		t.Fatal("expected diag url with userinfo to be rejected")
 	}
 }
 
