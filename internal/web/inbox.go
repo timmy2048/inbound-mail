@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -75,7 +76,7 @@ type MessageView struct {
 	Token       string
 	Sender      string
 	Subject     string
-	Text        string
+	TextHTML    template.HTML
 	HasText     bool
 	HasHTML     bool
 	Received    string
@@ -101,7 +102,7 @@ func (s *Server) message(w http.ResponseWriter, r *http.Request) {
 		Token:       mb.Token,
 		Sender:      msg.Sender,
 		Subject:     showSubject(msg.Subject),
-		Text:        msg.TextBody,
+		TextHTML:    linkifyText(msg.TextBody),
 		HasText:     strings.TrimSpace(msg.TextBody) != "",
 		HasHTML:     strings.TrimSpace(msg.HTMLBody) != "",
 		Received:    displayTime(msg.ReceivedAt),
@@ -134,7 +135,7 @@ func (s *Server) messageHTML(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "<!DOCTYPE html><meta charset=\"utf-8\"><p>这封信没有 HTML 正文。</p>")
 		return
 	}
-	_, _ = io.WriteString(w, msg.HTMLBody)
+	_, _ = io.WriteString(w, rewriteMailHTML(msg.HTMLBody))
 }
 
 func (s *Server) attachment(w http.ResponseWriter, r *http.Request) {

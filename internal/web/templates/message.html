@@ -25,7 +25,7 @@
 <section aria-labelledby="body-heading">
   <h2 id="body-heading">正文</h2>
   {{if .HasText}}
-  <pre class="mail">{{.Text}}</pre>
+  <pre class="mail">{{.TextHTML}}</pre>
   {{else if not .HasHTML}}
   <div class="empty"><p>这封信没有可显示的正文。</p></div>
   {{end}}

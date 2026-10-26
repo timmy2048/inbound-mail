@@ -343,6 +343,8 @@ form.path-actions { margin: 0.75rem 0 0; }
 .mark-ok { color: var(--moss); }
 .mark-bad { color: var(--seal-deep); }
 
+pre.mail a { text-underline-offset: 0.15em; }
+
 .dns-plain, pre {
   white-space: pre-wrap;
   word-break: break-word;
