@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"laijian/internal/config"
+	"laijian/internal/dnsinfo"
 	"laijian/internal/generate"
 	"laijian/internal/store"
 )
@@ -42,6 +43,9 @@ type Server struct {
 	http    *http.Server
 	limit   *limiter
 	handler http.Handler
+	dnsMu   sync.RWMutex
+	dns     dnsinfo.Resolver
+	checks  dnsChecks
 }
 
 func New(cfg config.Config, st *store.Store) (*Server, error) {
@@ -105,6 +109,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /admin", s.requireAdmin(s.domains))
 	mux.HandleFunc("POST /admin/domains", s.requireAdmin(s.createDomain))
 	mux.HandleFunc("GET /admin/domains/{id}", s.requireAdmin(s.domainPage))
+	mux.HandleFunc("POST /admin/domains/{id}/verify", s.requireAdmin(s.verifyDNS))
 	mux.HandleFunc("POST /admin/domains/{id}/mailboxes", s.requireAdmin(s.generateMailboxes))
 	mux.HandleFunc("POST /admin/domains/{id}/delete", s.requireAdmin(s.deleteDomain))
 	mux.HandleFunc("GET /admin/domains/{id}/mailboxes.csv", s.requireAdmin(s.exportDomainCSV))

@@ -1,13 +1,13 @@
 {{define "domains"}}
 {{template "head" .}}
 <h1>域名</h1>
-<p class="lede">添加之后会给出 MX 和 A 记录。信只进已生成的邮箱。</p>
+<p class="lede">添加之后给出收信 DNS。公网走 Cloudflare Email Routing。信只进已生成的邮箱。</p>
 <form method="post" action="/admin/domains">
   <input type="hidden" name="csrf" value="{{.CSRF}}">
   <div class="field">
     <label for="domain">域名</label>
     <input id="domain" name="domain" type="text" value="{{.Prefill}}" required maxlength="253" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="richrich.cc.cd" aria-describedby="domain-hint">
-    <p class="hint" id="domain-hint">例如 richrich.cc.cd。本版只接受 ASCII 域名。添加后立刻看到 DNS 清单。</p>
+    <p class="hint" id="domain-hint">例如 richrich.cc.cd。本版只接受 ASCII 域名。添加后可以看到要填的记录，并验证是否生效。</p>
   </div>
   <button type="submit">添加域名</button>
 </form>

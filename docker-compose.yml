@@ -9,8 +9,9 @@ services:
     ports:
       # 后台和查看页：http://127.0.0.1:8787
       - "8787:8080"
-      # 本机注入测试。只有 25 端口进得来的机器才改成 "25:2525"（容器内仍是非特权端口）。
-      # Oracle Cloud 入站 25 到不了，不要映射 25，改走 Cloudflare Email Routing（见 README）。
+      # 本机注入测试。Oracle Cloud 入站 25 到不了，不要映射 25。
+      # 公网收信走 Cloudflare Email Routing，Worker 打到 mail.<域名>:8787 的 /ingest。
+      # 只有自建 SMTP 且 25 端口进得来时，才改成 "25:2525"（容器内仍是非特权端口）。
       - "2525:2525"
     env_file:
       - path: .env

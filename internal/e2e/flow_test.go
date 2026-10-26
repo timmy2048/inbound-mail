@@ -110,17 +110,29 @@ func TestAdminInboxAndInboundSMTP(t *testing.T) {
 		t.Fatalf("add domain status=%d body=%s", status, body)
 	}
 	for _, want := range []string{
+		"收信 DNS",
+		"推荐：Cloudflare Email Routing",
+		"route1.mx.cloudflare.net",
+		"route2.mx.cloudflare.net",
+		"route3.mx.cloudflare.net",
+		"验证 DNS",
+		"可选：自建 SMTP（实验室）",
 		"mail.richrich.cc.cd",
-		"仅 DNS",
-		"灰云",
-		"不要打开橙色代理",
-		"Cloudflare",
 		"203.0.113.10",
-		"优先级",
+		"灰云",
+		"不要把 MX 指到这台机器",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("dns page missing %q", want)
 		}
+	}
+	if strings.Contains(body, "把收信指到这台服务器") {
+		t.Fatal("old dns heading still shown")
+	}
+	cfAt := strings.Index(body, "推荐：Cloudflare Email Routing")
+	selfAt := strings.Index(body, "可选：自建 SMTP（实验室）")
+	if cfAt < 0 || selfAt < 0 || cfAt > selfAt {
+		t.Fatalf("path order cf=%d self=%d", cfAt, selfAt)
 	}
 	csrf = mustCSRF(t, body)
 	domainPath := regexp.MustCompile(`/admin/domains/\d+`).FindString(body)
@@ -237,7 +249,7 @@ func TestAdminInboxAndInboundSMTP(t *testing.T) {
 		t.Fatalf("order second=%d kept=%d yesterday=%d", secondAt, keptAt, yesterdayAt)
 	}
 
-	msgRef := regexp.MustCompile(`/m/` + regexp.QuoteMeta(token) + `/messages/(\d+)`).FindAllStringSubmatch(inbox, -1)
+	msgRef := regexp.MustCompile(`/m/`+regexp.QuoteMeta(token)+`/messages/(\d+)`).FindAllStringSubmatch(inbox, -1)
 	var sawTruncated bool
 	for _, ref := range msgRef {
 		status, page := get(t, client, webSrv.URL+"/m/"+token+"/messages/"+ref[1])

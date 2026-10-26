@@ -10,7 +10,7 @@
 
 | 名字 | 放哪里 | 作用 |
 | --- | --- | --- |
-| `INGEST_URL` | `wrangler secret put`，本地是 `.dev.vars` | 来件的完整地址，例如 `https://mail.example.com/ingest`。Worker 跑在 Cloudflare 上，`127.0.0.1` 和内网地址都到不了 VPS。 |
+| `INGEST_URL` | `wrangler secret put`，本地是 `.dev.vars` | 来件的完整地址，例如 `http://mail.example.com:8787/ingest`。Worker 跑在 Cloudflare 上，`127.0.0.1` 和内网地址都到不了 VPS。 |
 | `INGEST_TOKEN` | 同上 | 和来件 `INGEST_TOKEN` 同一串。请求头是 `Authorization: Bearer …`。 |
 
 ## 操作者还要自己做的
