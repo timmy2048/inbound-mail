@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -75,7 +76,7 @@ type MessageView struct {
 	Token       string
 	Sender      string
 	Subject     string
-	Text        string
+	TextHTML    template.HTML
 	HasText     bool
 	HasHTML     bool
 	Received    string
@@ -101,7 +102,7 @@ func (s *Server) message(w http.ResponseWriter, r *http.Request) {
 		Token:       mb.Token,
 		Sender:      msg.Sender,
 		Subject:     showSubject(msg.Subject),
-		Text:        msg.TextBody,
+		TextHTML:    linkifyText(msg.TextBody),
 		HasText:     strings.TrimSpace(msg.TextBody) != "",
 		HasHTML:     strings.TrimSpace(msg.HTMLBody) != "",
 		Received:    displayTime(msg.ReceivedAt),
@@ -127,14 +128,20 @@ func (s *Server) messageHTML(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; frame-ancestors 'self'")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Cache-Control", "no-store")
+	// The framed document opens other sites. COOP same-origin (set on every
+	// response by the outer middleware) makes those popped windows inherit a
+	// sandboxed opener and fail, which Chrome paints inside this frame.
+	w.Header().Set("Cross-Origin-Opener-Policy", "unsafe-none")
 	if strings.TrimSpace(msg.HTMLBody) == "" {
+		w.Header().Set("Content-Security-Policy", mailHTMLCSP(""))
 		_, _ = io.WriteString(w, "<!DOCTYPE html><meta charset=\"utf-8\"><p>这封信没有 HTML 正文。</p>")
 		return
 	}
-	_, _ = io.WriteString(w, msg.HTMLBody)
+	body, nonce := rewriteMailHTML(msg.HTMLBody)
+	w.Header().Set("Content-Security-Policy", mailHTMLCSP(nonce))
+	_, _ = io.WriteString(w, body)
 }
 
 func (s *Server) attachment(w http.ResponseWriter, r *http.Request) {

@@ -25,14 +25,14 @@
 <section aria-labelledby="body-heading">
   <h2 id="body-heading">正文</h2>
   {{if .HasText}}
-  <pre class="mail">{{.Text}}</pre>
+  <pre class="mail">{{.TextHTML}}</pre>
   {{else if not .HasHTML}}
   <div class="empty"><p>这封信没有可显示的正文。</p></div>
   {{end}}
   {{if .HasHTML}}
   <h3>HTML</h3>
   <p class="hint">外链图片不会加载，避免发件人追踪打开了这封信的人。</p>
-  <iframe class="html-mail" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="HTML 正文" src="/m/{{.Token}}/messages/{{.MessageID}}/html"></iframe>
+  <iframe class="html-mail" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="HTML 正文" src="/m/{{.Token}}/messages/{{.MessageID}}/html"></iframe>
   {{end}}
 </section>
 {{template "foot" .}}
