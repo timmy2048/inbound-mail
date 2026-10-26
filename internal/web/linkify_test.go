@@ -48,20 +48,33 @@ func TestLinkifyTextLeavesDangerousSchemesEscaped(t *testing.T) {
 
 func TestRewriteMailHTMLKeepsSafeAnchors(t *testing.T) {
 	src := `<p>F5加速 <a href="http://fast520.cc.cd" onclick="steal()">打开</a> <a href="javascript:alert(1)">bad</a><img src="https://tracker.example/p.png" alt="dot"></p>`
-	got := rewriteMailHTML(src)
+	src += `<meta http-equiv="refresh" content="0;url=http://fast520.cc.cd"><base target="_self"><script>alert(1)</script>`
+	src += `<a href="//fast520.cc.cd/go"><img alt="F5加速" src="https://fast520.cc.cd/brand/fast520-logo.webp"></a>`
+	got, nonce := rewriteMailHTML(src)
 	for _, want := range []string{
 		`href="http://fast520.cc.cd"`,
+		`href="https://fast520.cc.cd/go"`,
 		`rel="noopener noreferrer"`,
 		`target="_blank"`,
+		`<base target="_blank"/>`,
+		`nonce="` + nonce + `"`,
 		`src="https://tracker.example/p.png"`,
 		"打开",
+		"window.open",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in %s", want, got)
 		}
 	}
-	if strings.Contains(got, "javascript:") || strings.Contains(got, "onclick") {
+	if strings.Contains(got, "javascript:") || strings.Contains(got, "onclick") || strings.Contains(got, "alert(1)") || strings.Contains(got, "http-equiv") || strings.Contains(got, `target="_self"`) {
 		t.Fatalf("unsafe html kept: %s", got)
+	}
+	csp := mailHTMLCSP(nonce)
+	if !strings.Contains(csp, "img-src data:") || strings.Contains(csp, "img-src http") || strings.Contains(csp, "img-src *") {
+		t.Fatal(csp)
+	}
+	if !strings.Contains(csp, "nonce-"+nonce) || !strings.Contains(csp, "allow-popups-to-escape-sandbox") || !strings.Contains(csp, "allow-scripts") {
+		t.Fatal(csp)
 	}
 }
 
@@ -143,11 +156,17 @@ func TestMessagePageAutolinksText(t *testing.T) {
 	if !strings.Contains(csp, "img-src data:") || strings.Contains(csp, "img-src http") || strings.Contains(csp, "img-src *") {
 		t.Fatalf("csp %s", csp)
 	}
+	if res.Header.Get("Cross-Origin-Opener-Policy") != "unsafe-none" {
+		t.Fatalf("coop %s", res.Header.Get("Cross-Origin-Opener-Policy"))
+	}
 	htmlText := string(htmlBody)
-	if !strings.Contains(htmlText, `rel="noopener noreferrer"`) || !strings.Contains(htmlText, `target="_blank"`) {
+	if !strings.Contains(htmlText, `rel="noopener noreferrer"`) || !strings.Contains(htmlText, `target="_blank"`) || !strings.Contains(htmlText, "window.open") {
 		t.Fatal(htmlText)
 	}
 	if !strings.Contains(htmlText, `src="https://tracker.example/p.png"`) {
 		t.Fatal(htmlText)
+	}
+	if !strings.Contains(body, `sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"`) {
+		t.Fatal("iframe sandbox")
 	}
 }

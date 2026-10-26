@@ -1,6 +1,8 @@
 package web
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"html"
 	"html/template"
 	"net/url"
@@ -10,6 +12,33 @@ import (
 
 	xhtml "golang.org/x/net/html"
 )
+
+// mailFrameSandbox is the iframe sandbox for HTML mail. Scripts are allowed
+// only so the document can open http(s) links itself; CSP script-src is a
+// nonce, and the frame stays a unique origin (no allow-same-origin).
+const mailFrameSandbox = "allow-scripts allow-popups allow-popups-to-escape-sandbox"
+
+// mailClickScript opens safe links in a new unsandboxed tab and cancels the
+// click. Without this, a sandboxed frame follows the link itself. Sites that
+// send X-Frame-Options: DENY then paint Chrome's blocked-frame placeholder
+// where the message used to be.
+const mailClickScript = `(function(){
+document.addEventListener("click",openMailLink,true);
+document.addEventListener("auxclick",openMailLink,true);
+function openMailLink(event){
+var el=event.target;
+while(el&&el.nodeName!=="A"&&el.nodeName!=="AREA")el=el.parentNode;
+if(!el)return;
+var href=el.getAttribute("href")||"";
+var scheme=href.slice(0,href.indexOf(":")).toLowerCase();
+if(scheme!=="http"&&scheme!=="https"&&scheme!=="mailto")return;
+el.setAttribute("target","_blank");
+el.setAttribute("rel","noopener noreferrer");
+event.preventDefault();
+var opened=window.open(href,"_blank","noopener,noreferrer");
+if(opened)opened.opener=null;
+}
+})();`
 
 // linkifyText escapes plain text and turns http(s) URLs into links.
 // The result is safe to render: everything outside a link is escaped.
@@ -147,36 +176,111 @@ func safeHTTPURL(raw string) (string, bool) {
 	return raw, true
 }
 
+// mailHTMLCSP is the policy for the framed message document.
+// Remote images stay limited to data: URLs. The sandbox token list must
+// match the iframe attribute: a CSP sandbox is intersected with it, and a
+// shorter list would drop allow-popups-to-escape-sandbox.
+func mailHTMLCSP(nonce string) string {
+	scriptSrc := "'none'"
+	sandbox := "sandbox"
+	if nonce != "" {
+		scriptSrc = "'nonce-" + nonce + "'"
+		sandbox = "sandbox " + mailFrameSandbox
+	}
+	return sandbox + "; default-src 'none'; script-src " + scriptSrc + "; style-src 'unsafe-inline'; img-src data:; form-action 'none'; frame-ancestors 'self'"
+}
+
 // rewriteMailHTML keeps http(s) and mailto anchors, and gives them a safe
-// rel and target. Other href schemes are dropped. Markup other than anchors
-// is left in place; remote images stay blocked by the response CSP.
-func rewriteMailHTML(src string) string {
-	if strings.TrimSpace(src) == "" {
-		return src
+// rel and target. Other href schemes are dropped. The returned nonce allows
+// exactly one inline script, which opens those links outside the frame.
+// Remote images are left in the markup and blocked by the response CSP.
+func rewriteMailHTML(src string) (string, string) {
+	nonce, err := randomNonce()
+	if err != nil || strings.TrimSpace(src) == "" {
+		return src, ""
 	}
 	root, err := xhtml.Parse(strings.NewReader(src))
 	if err != nil {
-		return src
+		return html.EscapeString(src), ""
 	}
 	var walk func(*xhtml.Node)
 	walk = func(n *xhtml.Node) {
-		if n.Type == xhtml.ElementNode {
-			if n.Data == "a" {
-				rewriteAnchor(n)
-			} else {
-				n.Attr = dropHandlers(n.Attr)
+		for c := n.FirstChild; c != nil; {
+			next := c.NextSibling
+			if c.Type == xhtml.ElementNode && dropElement(c) {
+				n.RemoveChild(c)
+				c = next
+				continue
 			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == xhtml.ElementNode {
+				switch c.Data {
+				case "a", "area":
+					rewriteAnchor(c)
+				default:
+					c.Attr = dropHandlers(c.Attr)
+				}
+			}
 			walk(c)
+			c = next
 		}
 	}
 	walk(root)
+	if head := findElement(root, "head"); head != nil {
+		head.AppendChild(&xhtml.Node{
+			Type: xhtml.ElementNode,
+			Data: "base",
+			Attr: []xhtml.Attribute{{Key: "target", Val: "_blank"}},
+		})
+		script := &xhtml.Node{
+			Type: xhtml.ElementNode,
+			Data: "script",
+			Attr: []xhtml.Attribute{{Key: "nonce", Val: nonce}},
+		}
+		script.AppendChild(&xhtml.Node{Type: xhtml.TextNode, Data: mailClickScript})
+		head.AppendChild(script)
+	}
 	var b strings.Builder
 	if err := xhtml.Render(&b, root); err != nil {
-		return src
+		return html.EscapeString(src), ""
 	}
-	return b.String()
+	return b.String(), nonce
+}
+
+func randomNonce() (string, error) {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf[:]), nil
+}
+
+func findElement(n *xhtml.Node, name string) *xhtml.Node {
+	if n.Type == xhtml.ElementNode && n.Data == name {
+		return n
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if found := findElement(c, name); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func dropElement(n *xhtml.Node) bool {
+	switch n.Data {
+	case "script", "iframe", "object", "embed", "applet", "frame", "frameset", "base", "link", "form":
+		return true
+	case "meta":
+		for _, a := range n.Attr {
+			if strings.EqualFold(a.Key, "http-equiv") {
+				switch strings.ToLower(strings.TrimSpace(a.Val)) {
+				case "refresh", "content-security-policy", "set-cookie":
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func rewriteAnchor(n *xhtml.Node) {
@@ -187,7 +291,7 @@ func rewriteAnchor(n *xhtml.Node) {
 		switch key {
 		case "href":
 			href = a.Val
-		case "rel", "target":
+		case "rel", "target", "ping":
 			continue
 		default:
 			if strings.HasPrefix(key, "on") {
@@ -221,11 +325,14 @@ func dropHandlers(attrs []xhtml.Attribute) []xhtml.Attribute {
 
 func safeHref(raw string) string {
 	raw = strings.TrimSpace(raw)
-	if raw == "" || strings.ContainsAny(raw, "\r\n\t") {
+	if raw == "" || strings.ContainsAny(raw, "\r\n\t ") {
 		return ""
 	}
+	if strings.HasPrefix(raw, "//") {
+		raw = "https:" + raw
+	}
 	u, err := url.Parse(raw)
-	if err != nil {
+	if err != nil || u.User != nil {
 		return ""
 	}
 	switch strings.ToLower(u.Scheme) {
