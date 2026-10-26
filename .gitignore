@@ -1,0 +1,6 @@
+.env
+/data/
+*.db
+*.db-*
+/bin/
+/tmp/

@@ -1,0 +1,39 @@
+{{define "domains"}}
+{{template "head" .}}
+<h1>域名</h1>
+<p class="lede">添加之后会给出 MX 和 A 记录。信只进已生成的邮箱。</p>
+<form method="post" action="/admin/domains">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <div class="field">
+    <label for="domain">域名</label>
+    <input id="domain" name="domain" type="text" value="{{.Prefill}}" required maxlength="253" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="richrich.cc.cd" aria-describedby="domain-hint">
+    <p class="hint" id="domain-hint">例如 richrich.cc.cd。本版只接受 ASCII 域名。添加后立刻看到 DNS 清单。</p>
+  </div>
+  <button type="submit">添加域名</button>
+</form>
+{{if .Domains}}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>域名</th><th>邮箱</th><th>添加时间</th><th></th></tr>
+  </thead>
+  <tbody>
+    {{range .Domains}}
+    <tr>
+      <td class="addr">{{.Name}}</td>
+      <td>{{.Count}}</td>
+      <td><time datetime="{{.RFC}}">{{.Created}}</time></td>
+      <td><a href="/admin/domains/{{.ID}}">查看 DNS 和邮箱</a></td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<div class="empty">
+  <p>还没有域名。</p>
+  <p>可以先加 richrich.cc.cd，或你自己的域名。</p>
+</div>
+{{end}}
+{{template "foot" .}}
+{{end}}

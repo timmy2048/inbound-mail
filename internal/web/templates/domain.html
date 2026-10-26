@@ -1,0 +1,119 @@
+{{define "domain"}}
+{{template "head" .}}
+<p class="crumb"><a href="/admin">全部域名</a></p>
+<h1 class="domain-name">{{.Domain.Name}}</h1>
+<p>已有 {{.Domain.MailboxCount}} 个邮箱。添加于 <time datetime="{{.RFC}}">{{.Created}}</time>（北京时间）。</p>
+
+<section aria-labelledby="dns-heading">
+  <h2 id="dns-heading">把收信指到这台服务器</h2>
+  {{if .DNS.IPWarning}}<div class="banner warn" role="status">{{.DNS.IPWarning}}</div>{{end}}
+  <p>{{.DNS.Note}}</p>
+  <p class="hint">SPF、DKIM、DMARC 这版不配。只收信时不是必须，以后若要拒收伪造来源再补。</p>
+  <ol class="steps">
+    <li>
+      <h3>MX 记录</h3>
+      <dl class="record">
+        <dt>类型</dt><dd>MX</dd>
+        <dt>名称</dt><dd><code>@</code> <span class="hint">有的面板要填 {{.Domain.Name}} 本身</span></dd>
+        <dt>邮件主机</dt><dd><code>{{.DNS.MXHost}}</code></dd>
+        <dt>优先级</dt><dd><code>10</code></dd>
+        <dt>代理</dt><dd>仅 DNS（灰云）。不要打开橙色代理。</dd>
+      </dl>
+    </li>
+    <li>
+      <h3>A 记录</h3>
+      <dl class="record">
+        <dt>类型</dt><dd>A</dd>
+        <dt>名称</dt><dd><code>mail</code></dd>
+        <dt>完整名称</dt><dd><code>{{.DNS.MXHost}}</code></dd>
+        <dt>IPv4</dt><dd><code>{{.DNS.IP}}</code></dd>
+        <dt>代理</dt><dd>仅 DNS（灰云）。不要打开橙色代理。</dd>
+      </dl>
+    </li>
+    <li>
+      <h3>开始收信</h3>
+      <p>解析生效后，只向本页生成的地址发信。没有生成过的收件人，服务器直接拒收。</p>
+    </li>
+  </ol>
+  <h3>可复制的清单</h3>
+  <pre class="dns-plain">{{.DNS.Plain}}</pre>
+</section>
+
+<section aria-labelledby="gen-heading">
+  <h2 id="gen-heading">生成邮箱</h2>
+  <form method="post" action="/admin/domains/{{.Domain.ID}}/mailboxes">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <div class="field">
+      <label for="count">数量</label>
+      <input id="count" name="count" type="text" inputmode="numeric" pattern="[0-9]+" required maxlength="3" value="{{.Count}}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" aria-describedby="count-hint">
+      <p class="hint" id="count-hint">本地部分固定 10 位，只含小写字母 a–z 和数字 0–9。一次最多 500 个。每个地址一条永久查看链接，本版不能作废或轮换。</p>
+    </div>
+    <button type="submit">生成随机邮箱</button>
+  </form>
+</section>
+
+<section aria-labelledby="list-heading">
+  <h2 id="list-heading">邮箱和查看链接</h2>
+  <p><a class="button secondary" href="/admin/domains/{{.Domain.ID}}/mailboxes.csv">导出这个域名的 CSV</a></p>
+  {{if .Mailboxes}}
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>地址</th><th>查看链接</th><th>创建时间</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Mailboxes}}
+      <tr>
+        <td class="addr">{{.Address}}</td>
+        <td>
+          <div class="linkline">
+            <input type="text" readonly value="{{.MagicURL}}" aria-label="{{.Address}} 的查看链接" spellcheck="false">
+            <button type="button" class="secondary" data-copy="{{.MagicURL}}">复制链接</button>
+          </div>
+        </td>
+        <td><time datetime="{{.RFC}}">{{.Created}}</time></td>
+        <td>
+          <details>
+            <summary>删除</summary>
+            <form method="post" action="/admin/mailboxes/{{.ID}}/delete">
+              <input type="hidden" name="csrf" value="{{$.CSRF}}">
+              <p>删除后这个地址立即拒收，查看链接失效，已收的信一并删除。</p>
+              <button type="submit" class="secondary">确认删除</button>
+            </form>
+          </details>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <div class="empty">
+    <p>这个域名下还没有邮箱。</p>
+  </div>
+  {{end}}
+</section>
+
+<section aria-labelledby="inject-heading">
+  <h2 id="inject-heading">本地注入一封测试信</h2>
+  <p>宿主机的 25 端口经常不能用。生成地址后，在项目目录执行，把收件人换成上面的真实地址：</p>
+  <pre>go run ./cmd/inject -smtp 127.0.0.1:2525 -to 本地部分@{{.Domain.Name}}</pre>
+  <p class="hint">用 Docker 时，本机 2525 已经映射到容器里的 SMTP。不必先改公网 DNS。</p>
+</section>
+
+<section aria-labelledby="drop-heading">
+  <h2 id="drop-heading">删除这个域名</h2>
+  <details>
+    <summary>删除 {{.Domain.Name}}</summary>
+    <form method="post" action="/admin/domains/{{.Domain.ID}}/delete">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label class="check">
+        <input type="checkbox" name="ack" value="1" required>
+        <span>我知道这会删掉该域名下的全部邮箱、查看链接和邮件。</span>
+      </label>
+      <button type="submit" class="secondary">确认删除域名</button>
+    </form>
+  </details>
+</section>
+{{template "foot" .}}
+{{end}}

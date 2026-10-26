@@ -1,0 +1,34 @@
+# 本地和以后的单机 VPS 用同一份编排。
+# 先复制 .env.example 为 .env，设置 ADMIN_PASSWORD，再 docker compose up --build。
+
+name: laijian
+
+services:
+  app:
+    build: .
+    ports:
+      # 后台和查看页：http://127.0.0.1:8787
+      - "8787:8080"
+      # 本机注入测试。真收公网信时改成 "25:2525"（容器内仍是非特权端口）。
+      - "2525:2525"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HTTP_ADDR: ":8080"
+      SMTP_ADDR: ":2525"
+      MAIL_DATA_DIR: /data
+      DATABASE_PATH: /data/mail.db
+      TZ: Asia/Shanghai
+    volumes:
+      - maildata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+
+volumes:
+  maildata:

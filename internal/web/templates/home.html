@@ -1,0 +1,9 @@
+{{define "home"}}
+{{template "head" .}}
+<h1>来件</h1>
+<p class="lede">这台机器只收下已经登记的地址，不把信发出去。</p>
+<p>收件人没在后台生成过的，SMTP 直接拒收。同一地址可以收很多封，按时间排列，新的在上面。</p>
+<p>查看信件请打开交给你的链接。链接长期有效，本版不能作废，也不能轮换。</p>
+<p><a class="button" href="/admin/login">进入后台</a></p>
+{{template "foot" .}}
+{{end}}

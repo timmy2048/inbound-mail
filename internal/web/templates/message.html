@@ -1,0 +1,39 @@
+{{define "message"}}
+{{template "head" .}}
+<p class="crumb"><a href="/m/{{.Token}}">返回 {{.Address}}</a></p>
+<h1>{{.Subject}}</h1>
+<dl class="record meta">
+  <dt>发件人</dt><dd>{{.Sender}}</dd>
+  <dt>收件人</dt><dd class="addr">{{.Address}}</dd>
+  <dt>收到</dt><dd><time datetime="{{.ReceivedRFC}}">{{.Received}}</time> 北京时间</dd>
+  <dt>主题</dt><dd>{{.Subject}}</dd>
+</dl>
+{{if .Attachments}}
+<section aria-labelledby="att-heading">
+  <h2 id="att-heading">附件</h2>
+  <ul class="atts">
+    {{range .Attachments}}
+    <li>
+      <a href="/m/{{$.Token}}/attachments/{{.ID}}">{{.Filename}}</a>
+      <span class="hint">{{.ContentType}} · {{.Size}}</span>
+      {{if .Truncated}}<span class="badge">已截断，原始 {{.Size}}，只保存了前 {{.Stored}}</span>{{end}}
+    </li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
+<section aria-labelledby="body-heading">
+  <h2 id="body-heading">正文</h2>
+  {{if .HasText}}
+  <pre class="mail">{{.Text}}</pre>
+  {{else if not .HasHTML}}
+  <div class="empty"><p>这封信没有可显示的正文。</p></div>
+  {{end}}
+  {{if .HasHTML}}
+  <h3>HTML</h3>
+  <p class="hint">外链图片不会加载，避免发件人追踪打开了这封信的人。</p>
+  <iframe class="html-mail" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="HTML 正文" src="/m/{{.Token}}/messages/{{.MessageID}}/html"></iframe>
+  {{end}}
+</section>
+{{template "foot" .}}
+{{end}}

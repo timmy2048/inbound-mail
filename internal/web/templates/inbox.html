@@ -1,0 +1,26 @@
+{{define "inbox"}}
+{{template "head" .}}
+<p class="kicker">邮箱</p>
+<h1 class="domain-name">{{.Address}}</h1>
+<p class="hint">按收到时间排列，新的在上面。时间是北京时间。超过 {{.RetentionDays}} 天的信会自动删除。</p>
+{{if .More}}<div class="banner warn" role="status">收件很多，这里只列出最近 200 封。</div>{{end}}
+{{if .Rows}}
+<ol class="msg-list">
+  {{range .Rows}}
+  <li>
+    <a href="/m/{{$.Token}}/messages/{{.ID}}">
+      <time datetime="{{.ReceivedRFC}}">{{.Received}}</time>
+      <span class="from">{{.Sender}}</span>
+      <span class="subject">{{.Subject}}</span>
+    </a>
+  </li>
+  {{end}}
+</ol>
+{{else}}
+<div class="empty">
+  <p>这个邮箱还没有信。</p>
+  <p>把地址交给对方，或在服务器上用注入命令发一封测试信。超过保留期的信会被自动删除。</p>
+</div>
+{{end}}
+{{template "foot" .}}
+{{end}}

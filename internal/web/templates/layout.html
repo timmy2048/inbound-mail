@@ -1,0 +1,51 @@
+{{define "head"}}<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>{{if eq .Title "来件"}}来件{{else}}{{.Title}} · 来件{{end}}</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<header class="top">
+  <a class="brand" href="/">
+    <span class="seal" aria-hidden="true">收</span>
+    <span class="brand-text">
+      <span class="brand-name">来件</span>
+      <span class="brand-sub">只收不发</span>
+    </span>
+  </a>
+  {{if .Admin}}
+  <nav aria-label="后台">
+    <a href="/admin">域名</a>
+    <a href="/admin/mailboxes.csv">导出 CSV</a>
+    <form method="post" action="/admin/logout">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button type="submit" class="linkish">退出</button>
+    </form>
+  </nav>
+  {{end}}
+</header>
+<main id="main" class="sheet">
+{{template "banner" .}}
+{{end}}
+
+{{define "banner"}}
+{{if .Error}}<div class="banner error" role="alert">{{.Error}}</div>{{end}}
+{{if .Notice}}<div class="banner ok" role="status">{{.Notice}}</div>{{end}}
+{{end}}
+
+{{define "foot"}}
+</main>
+<footer class="colophon">
+  <p>来件只接收已生成的地址，不向外发信。信件保留 {{.RetentionDays}} 天，单个附件超过 {{.AttachmentMax}} 时只保存前面那一段。</p>
+</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
+{{end}}
