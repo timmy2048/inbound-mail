@@ -48,6 +48,14 @@ func main() {
 	go func() { errCh <- smtpServer.ListenAndServe() }()
 	go func() { errCh <- httpServer.ListenAndServe() }()
 	log.Printf("http listening on %s", cfg.HTTPAddr)
+	if cfg.IngestEnabled() {
+		if len(cfg.IngestToken) < 16 {
+			log.Printf("http ingest token is shorter than 16 characters")
+		}
+		log.Printf("http ingest enabled on POST /ingest")
+	} else {
+		log.Printf("http ingest disabled (INGEST_TOKEN empty)")
+	}
 	log.Printf("smtp listening on %s (inbound only)", cfg.SMTPAddr)
 	log.Printf("public base %s", cfg.PublicBaseURL)
 	log.Printf("retention %d days, attachment max %d bytes", cfg.RetentionDays, cfg.AttachmentMaxBytes)

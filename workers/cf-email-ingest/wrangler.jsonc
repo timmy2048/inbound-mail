@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "laijian-cf-email-ingest",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
+  // Both values are secrets so neither the token nor the server URL is committed.
+  // INGEST_URL is the public POST /ingest address, for example
+  // https://mail.example.com/ingest. The Worker runs on Cloudflare, so
+  // 127.0.0.1 and a private address will not work.
+  //   printf '%s' "$INGEST_URL" | npx wrangler secret put INGEST_URL
+  //   printf '%s' "$INGEST_TOKEN" | npx wrangler secret put INGEST_TOKEN
+  "secrets": {
+    "required": ["INGEST_URL", "INGEST_TOKEN"]
+  }
+  // Catch-all is omitted on purpose. Wrangler will not change Email Routing
+  // rules until you add an apex catch-all and deploy (Wrangler 4.113+):
+  // "addresses": ["*@richrich.cc.cd"]
+}

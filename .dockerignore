@@ -5,3 +5,6 @@ bin
 tmp
 *.db
 *.db-*
+node_modules
+workers
+.dev.vars
