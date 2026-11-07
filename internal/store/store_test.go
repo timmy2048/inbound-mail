@@ -123,6 +123,56 @@ func TestCreateMailboxesFormatAndRetention(t *testing.T) {
 	}
 }
 
+func TestCreateMailboxPrefixAndDuplicate(t *testing.T) {
+	st := openTest(t, 32)
+	now := time.Date(2026, 11, 7, 8, 0, 0, 0, time.UTC)
+	d, err := st.CreateDomain("richrich.cc.cd", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mb, err := st.CreateMailbox(d.ID, "  Hello.World ", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mb.LocalPart != "hello.world" || mb.Address != "hello.world@richrich.cc.cd" {
+		t.Fatalf("mailbox %+v", mb)
+	}
+	if len(mb.Token) < 40 {
+		t.Fatalf("token %q", mb.Token)
+	}
+	if _, err := st.CreateMailbox(d.ID, "HELLO.world", now.Add(time.Minute)); err != ErrExists {
+		t.Fatalf("duplicate err = %v", err)
+	}
+	if _, err := st.CreateMailbox(d.ID, "a..b", now); err == nil {
+		t.Fatal("invalid prefix was stored")
+	}
+	other, err := st.CreateDomain("other.test", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := st.CreateMailbox(other.ID, "hello.world", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Address != "hello.world@other.test" {
+		t.Fatalf("other domain %+v", second)
+	}
+	list, err := st.ListMailboxes(d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].Address != mb.Address || list[0].Token != mb.Token {
+		t.Fatalf("list %+v", list)
+	}
+	all, err := st.ListAllMailboxes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("all %+v", all)
+	}
+}
+
 func bytesOf(n int) []byte {
 	b := make([]byte, n)
 	for i := range b {

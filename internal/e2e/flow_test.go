@@ -282,6 +282,133 @@ func TestAdminInboxAndInboundSMTP(t *testing.T) {
 	}
 }
 
+func TestCustomPrefixMailbox(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.Config{
+		HTTPAddr:           "127.0.0.1:0",
+		SMTPAddr:           "127.0.0.1:0",
+		SMTPDomain:         "localhost",
+		PublicBaseURL:      "http://127.0.0.1:8787",
+		AdminPassword:      "test-password-please",
+		RetentionDays:      3,
+		AttachmentMaxBytes: 64,
+		MessageMaxBytes:    1 << 20,
+		MailDataDir:        dir,
+		DatabasePath:       filepath.Join(dir, "mail.db"),
+		ServerPublicIP:     "203.0.113.10",
+	}
+	st, err := store.Open(cfg.DatabasePath, cfg.MailDataDir, cfg.AttachmentMaxBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	httpSrv, err := web.New(cfg, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	webSrv := httptest.NewServer(httpSrv.Handler())
+	t.Cleanup(webSrv.Close)
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar}
+	status, body := postForm(t, client, webSrv.URL+"/admin/login", url.Values{
+		"username": {"admin"},
+		"password": {"test-password-please"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("login %d", status)
+	}
+	csrf := mustCSRF(t, body)
+	status, body = postForm(t, client, webSrv.URL+"/admin/domains", url.Values{
+		"csrf":   {csrf},
+		"domain": {"richrich.cc.cd"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("domain %d %s", status, body)
+	}
+	if !strings.Contains(body, `name="prefix"`) {
+		t.Fatal("domain page missing prefix field")
+	}
+	csrf = mustCSRF(t, body)
+	domainPath := regexp.MustCompile(`/admin/domains/\d+`).FindString(body)
+	domainURL := webSrv.URL + domainPath
+
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"prefix": {"  Hello.World "},
+		"count":  {"4"},
+	})
+	if status != http.StatusOK || !strings.Contains(body, "已生成 1 个邮箱") || !strings.Contains(body, "hello.world@richrich.cc.cd") {
+		t.Fatalf("prefix generate status=%d body=%s", status, body)
+	}
+	if strings.Count(body, "@richrich.cc.cd") < 1 {
+		t.Fatalf("address missing:\n%s", body)
+	}
+
+	csrf = mustCSRF(t, body)
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"prefix": {"HELLO.world"},
+		"count":  {"2"},
+	})
+	if status != http.StatusConflict || !strings.Contains(body, "已存在") || strings.Count(body, `scope="row"`) != 1 {
+		t.Fatalf("duplicate status=%d body=%s", status, body)
+	}
+
+	csrf = mustCSRF(t, body)
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"prefix": {"a..b"},
+		"count":  {"1"},
+	})
+	if status != http.StatusBadRequest || !strings.Contains(body, "前缀格式不正确") || strings.Contains(body, "a..b@") {
+		t.Fatalf("invalid status=%d body=%s", status, body)
+	}
+
+	csrf = mustCSRF(t, body)
+	status, csvBody := get(t, client, domainURL+"/mailboxes.csv")
+	if status != http.StatusOK {
+		t.Fatal(status)
+	}
+	records, err := csv.NewReader(strings.NewReader(strings.TrimPrefix(csvBody, "\uFEFF"))).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2 || records[1][0] != "hello.world@richrich.cc.cd" || records[1][3] != "richrich.cc.cd" {
+		t.Fatalf("csv %+v", records)
+	}
+	if !strings.HasPrefix(records[1][1], cfg.PublicBaseURL+"/m/") {
+		t.Fatalf("magic link %q", records[1][1])
+	}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	smtpSrv, err := smtpsrv.New(cfg, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { _ = smtpSrv.Serve(ln) }()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = smtpSrv.Shutdown(ctx)
+	})
+	raw := rfc822.Text("ada@example.com", "hello.world@richrich.cc.cd", "prefix-subject", "hello prefix")
+	if err := deliver(ln.Addr().String(), "ada@example.com", "hello.world@richrich.cc.cd", raw); err != nil {
+		t.Fatal(err)
+	}
+	token := strings.TrimPrefix(records[1][1], cfg.PublicBaseURL+"/m/")
+	status, inbox := get(t, client, webSrv.URL+"/m/"+token)
+	if status != http.StatusOK || !strings.Contains(inbox, "prefix-subject") {
+		t.Fatalf("inbox %d %s", status, inbox)
+	}
+}
+
 func get(t *testing.T, c *http.Client, rawURL string) (int, string) {
 	t.Helper()
 	res, err := c.Get(rawURL)

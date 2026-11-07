@@ -97,6 +97,48 @@ func (s *Store) DeleteDomain(id int64) error {
 	return nil
 }
 
+// CreateMailbox stores one address whose local part is a custom prefix.
+// The prefix is lowercased and checked. A local part that already exists
+// on this domain returns ErrExists and does not insert another row.
+func (s *Store) CreateMailbox(domainID int64, local string, now time.Time) (Mailbox, error) {
+	local, err := generate.NormalizePrefix(local)
+	if err != nil || local == "" {
+		return Mailbox{}, fmt.Errorf("invalid local part")
+	}
+	domain, err := s.Domain(domainID)
+	if err != nil {
+		return Mailbox{}, err
+	}
+	token, err := generate.RandomToken()
+	if err != nil {
+		return Mailbox{}, err
+	}
+	address := local + "@" + domain.Name
+	res, err := s.db.Exec(
+		`INSERT INTO mailboxes (domain_id, local_part, address, token, created_at) VALUES (?, ?, ?, ?, ?)`,
+		domain.ID, local, address, token, millis(now),
+	)
+	if isUnique(err) {
+		return Mailbox{}, ErrExists
+	}
+	if err != nil {
+		return Mailbox{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return Mailbox{}, err
+	}
+	return Mailbox{
+		ID:         id,
+		DomainID:   domain.ID,
+		DomainName: domain.Name,
+		LocalPart:  local,
+		Address:    address,
+		Token:      token,
+		CreatedAt:  now.UTC(),
+	}, nil
+}
+
 // CreateMailboxes allocates n random addresses on a domain.
 // Each address gets one permanent token. Collisions are retried.
 func (s *Store) CreateMailboxes(domainID int64, n int, now time.Time) ([]Mailbox, error) {

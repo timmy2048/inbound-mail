@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>{{if eq .Title "来件"}}来件{{else}}{{.Title}} · 来件{{end}}</title>
@@ -36,7 +36,7 @@
 {{end}}
 
 {{define "banner"}}
-{{if .Error}}<div class="banner error" role="alert">{{.Error}}</div>{{end}}
+{{if .Error}}<div class="banner error" id="form-error" role="alert">{{.Error}}</div>{{end}}
 {{if .Notice}}<div class="banner ok" role="status">{{.Notice}}</div>{{end}}
 {{end}}
 
