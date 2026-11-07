@@ -7,10 +7,12 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"laijian/internal/addr"
 	"laijian/internal/auth"
+	"laijian/internal/generate"
 	"laijian/internal/store"
 )
 
@@ -162,13 +164,15 @@ type DomainView struct {
 	RFC       string
 	Mailboxes []MailboxRow
 	Count     string
+	Prefix    string
+	BadPrefix bool
 }
 
 func (s *Server) domainPage(w http.ResponseWriter, r *http.Request) {
-	s.renderDomain(w, r, r.FormValue("count"), "", http.StatusOK)
+	s.renderDomain(w, r, "", "", "", http.StatusOK)
 }
 
-func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, errMsg string, status int) {
+func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, prefix, errMsg string, status int) {
 	id, ok := pathID(r, "id")
 	if !ok {
 		s.notFound(w, r)
@@ -194,11 +198,13 @@ func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, err
 		count = "10"
 	}
 	view := DomainView{
-		Base:    s.adminView(d.Name, r),
-		Domain:  d,
-		Created: displayTime(d.CreatedAt),
-		RFC:     rfc3339(d.CreatedAt),
-		Count:   count,
+		Base:      s.adminView(d.Name, r),
+		Domain:    d,
+		Created:   displayTime(d.CreatedAt),
+		RFC:       rfc3339(d.CreatedAt),
+		Count:     count,
+		Prefix:    prefix,
+		BadPrefix: strings.HasPrefix(errMsg, "前缀") || errMsg == "已存在",
 	}
 	view.Error = errMsg
 	view.Domain.MailboxCount = len(boxes)
@@ -224,9 +230,31 @@ func (s *Server) generateMailboxes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rawCount := r.FormValue("count")
+	rawPrefix := r.FormValue("prefix")
+	prefix, err := generate.NormalizePrefix(rawPrefix)
+	if err != nil {
+		s.renderDomain(w, r, rawCount, rawPrefix, "前缀格式不正确。", http.StatusBadRequest)
+		return
+	}
+	if prefix != "" {
+		if _, err := s.store.CreateMailbox(id, prefix, time.Now()); errors.Is(err, store.ErrNotFound) {
+			s.notFound(w, r)
+			return
+		} else if errors.Is(err, store.ErrExists) {
+			s.renderDomain(w, r, rawCount, prefix, "已存在", http.StatusConflict)
+			return
+		} else if err != nil {
+			log.Printf("generate mailbox: %v", err)
+			s.renderDomain(w, r, rawCount, prefix, "暂时没能生成邮箱。", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("admin generated domain_id=%d prefix=%s", id, prefix)
+		http.Redirect(w, r, fmt.Sprintf("/admin/domains/%d?notice=generated&n=1", id), http.StatusSeeOther)
+		return
+	}
 	n, err := strconv.Atoi(rawCount)
 	if err != nil || n < 1 || n > maxGenerate {
-		s.renderDomain(w, r, rawCount, fmt.Sprintf("数量请填写 1 到 %d 的整数。", maxGenerate), http.StatusBadRequest)
+		s.renderDomain(w, r, rawCount, "", fmt.Sprintf("数量请填写 1 到 %d 的整数。", maxGenerate), http.StatusBadRequest)
 		return
 	}
 	boxes, err := s.store.CreateMailboxes(id, n, time.Now())
@@ -236,7 +264,7 @@ func (s *Server) generateMailboxes(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Printf("generate mailboxes: %v", err)
-		s.renderDomain(w, r, rawCount, "暂时没能生成邮箱。", http.StatusInternalServerError)
+		s.renderDomain(w, r, rawCount, "", "暂时没能生成邮箱。", http.StatusInternalServerError)
 		return
 	}
 	log.Printf("admin generated domain_id=%d count=%d", id, len(boxes))
@@ -253,7 +281,7 @@ func (s *Server) deleteDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.FormValue("ack") != "1" {
-		s.renderDomain(w, r, "", "删除域名需要勾选确认。", http.StatusBadRequest)
+		s.renderDomain(w, r, "", "", "删除域名需要勾选确认。", http.StatusBadRequest)
 		return
 	}
 	if err := s.store.DeleteDomain(id); errors.Is(err, store.ErrNotFound) {

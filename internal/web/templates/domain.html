@@ -8,10 +8,15 @@
   <h2 id="gen-heading">生成邮箱</h2>
   <form method="post" action="/admin/domains/{{.Domain.ID}}/mailboxes">
     <input type="hidden" name="csrf" value="{{.CSRF}}">
-    <div class="field">
-      <label for="count">数量</label>
-      <input id="count" name="count" type="text" inputmode="numeric" pattern="[0-9]+" required maxlength="3" value="{{.Count}}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" aria-describedby="count-hint">
-      <p class="hint" id="count-hint">本地部分固定 10 位，只含小写字母 a–z 和数字 0–9。一次最多 500 个。每个地址一条永久查看链接，本版不能作废或轮换。</p>
+    <div class="split">
+      <div class="field">
+        <label for="prefix">前缀</label>
+        <input id="prefix" name="prefix" type="text" value="{{.Prefix}}" maxlength="64" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="可选" {{if .BadPrefix}}aria-invalid="true" aria-errormessage="form-error"{{end}}>
+      </div>
+      <div class="field">
+        <label for="count">数量</label>
+        <input id="count" name="count" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="{{.Count}}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
+      </div>
     </div>
     <button type="submit">生成随机邮箱</button>
   </form>
@@ -21,23 +26,23 @@
   <h2 id="list-heading">邮箱和查看链接</h2>
   <p><a class="button secondary" href="/admin/domains/{{.Domain.ID}}/mailboxes.csv">导出这个域名的 CSV</a></p>
   {{if .Mailboxes}}
-  <div class="table-wrap">
-  <table>
+  <div class="table-wrap" tabindex="0" role="region" aria-labelledby="list-heading">
+  <table class="boxes">
     <thead>
       <tr><th>地址</th><th>查看链接</th><th>创建时间</th><th></th></tr>
     </thead>
     <tbody>
       {{range .Mailboxes}}
       <tr>
-        <td class="addr">{{.Address}}</td>
+        <th scope="row" class="addr">{{.Address}}</th>
         <td>
           <div class="linkline">
             <input type="text" readonly value="{{.MagicURL}}" aria-label="{{.Address}} 的查看链接" spellcheck="false">
             <button type="button" class="secondary" data-copy="{{.MagicURL}}">复制链接</button>
           </div>
         </td>
-        <td><time datetime="{{.RFC}}">{{.Created}}</time></td>
-        <td>
+        <td class="num"><time datetime="{{.RFC}}">{{.Created}}</time></td>
+        <td class="action">
           <details>
             <summary>删除</summary>
             <form method="post" action="/admin/mailboxes/{{.ID}}/delete">

@@ -16,6 +16,16 @@ document.addEventListener("submit", (event) => {
 document.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  const reveal = target.closest("[data-reveal]");
+  if (reveal instanceof HTMLButtonElement) {
+    const input = document.getElementById(reveal.getAttribute("data-reveal") || "");
+    if (!(input instanceof HTMLInputElement)) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    reveal.textContent = show ? "隐藏" : "显示";
+    reveal.setAttribute("aria-pressed", show ? "true" : "false");
+    return;
+  }
   const button = target.closest("[data-copy]");
   if (!(button instanceof HTMLButtonElement)) return;
   const value = button.getAttribute("data-copy") || "";

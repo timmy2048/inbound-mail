@@ -1,6 +1,10 @@
 package generate
 
-import "testing"
+import (
+	"errors"
+	"strings"
+	"testing"
+)
 
 func TestLocalPartFormat(t *testing.T) {
 	seen := map[string]bool{}
@@ -31,6 +35,52 @@ func TestLocalPartFormat(t *testing.T) {
 	}
 	if ValidLocalPart("abc") || ValidLocalPart("ABCDEFGHIJ") || ValidLocalPart("abcd-efghi") {
 		t.Fatal("invalid samples were accepted")
+	}
+}
+
+func TestNormalizePrefix(t *testing.T) {
+	ok := []struct{ in, want string }{
+		{"", ""},
+		{"   ", ""},
+		{"A", "a"},
+		{" Hello.World ", "hello.world"},
+		{"support_1", "support_1"},
+		{"a-b", "a-b"},
+		{"a.b_c-d", "a.b_c-d"},
+		{"9box", "9box"},
+		{strings.Repeat("a", 64), strings.Repeat("a", 64)},
+	}
+	for _, tc := range ok {
+		got, err := NormalizePrefix(tc.in)
+		if err != nil || got != tc.want {
+			t.Fatalf("NormalizePrefix(%q) = %q, %v; want %q", tc.in, got, err, tc.want)
+		}
+	}
+	bad := []string{
+		".",
+		"-",
+		"_",
+		".hello",
+		"hello.",
+		"-hello",
+		"hello-",
+		"_hello",
+		"hello_",
+		"a..b",
+		"a...b",
+		"hello..world",
+		"has space",
+		"你好",
+		"hello@world",
+		"Hello World",
+		strings.Repeat("a", 65),
+		"a" + strings.Repeat(".b", 40),
+	}
+	for _, in := range bad {
+		got, err := NormalizePrefix(in)
+		if !errors.Is(err, ErrInvalidPrefix) || got != "" {
+			t.Fatalf("NormalizePrefix(%q) = %q, %v; want invalid", in, got, err)
+		}
 	}
 }
 
