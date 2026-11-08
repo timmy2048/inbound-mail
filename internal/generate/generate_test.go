@@ -14,8 +14,8 @@ func TestLocalPartFormat(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !ValidLocalPart(part) {
-			t.Fatalf("local part %q is not 10 chars from a-z0-9", part)
+		if !ValidLocalPart(part) || len(part) != DefaultLocalPartLength {
+			t.Fatalf("local part %q is not %d chars from a-z0-9", part, DefaultLocalPartLength)
 		}
 		if seen[part] {
 			t.Fatalf("duplicate local part %s in 200 draws", part)
@@ -33,8 +33,34 @@ func TestLocalPartFormat(t *testing.T) {
 	if letters == 0 || digits == 0 {
 		t.Fatalf("expected both letters and digits, letters=%d digits=%d", letters, digits)
 	}
-	if ValidLocalPart("abc") || ValidLocalPart("ABCDEFGHIJ") || ValidLocalPart("abcd-efghi") {
+	if ValidLocalPart("abc") || ValidLocalPart("ABCDEF") || ValidLocalPart("abcd-e") || ValidLocalPart("abcdefghij") {
 		t.Fatal("invalid samples were accepted")
+	}
+}
+
+func TestLocalPartLength(t *testing.T) {
+	if DefaultLocalPartLength != 6 || MinLocalPartLength != 4 || MaxLocalPartLength != 16 {
+		t.Fatalf("bounds min=%d default=%d max=%d", MinLocalPartLength, DefaultLocalPartLength, MaxLocalPartLength)
+	}
+	for _, n := range []int{4, 6, 16} {
+		part, err := RandomLocalPartN(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ValidLocalPartN(part, n) {
+			t.Fatalf("length %d produced %q", n, part)
+		}
+	}
+	for _, n := range []int{0, 3, 17, 64} {
+		if _, err := RandomLocalPartN(n); !errors.Is(err, ErrInvalidLength) {
+			t.Fatalf("RandomLocalPartN(%d) err=%v", n, err)
+		}
+		if ValidLocalPartN("abcd", n) {
+			t.Fatalf("ValidLocalPartN accepted length %d", n)
+		}
+	}
+	if ValidLocalPartN("ab.d", 4) || ValidLocalPartN("ABCDE", 5) {
+		t.Fatal("invalid alphabet accepted")
 	}
 }
 

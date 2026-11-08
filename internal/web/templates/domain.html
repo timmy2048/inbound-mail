@@ -11,13 +11,18 @@
     <div class="split">
       <div class="field">
         <label for="prefix">前缀</label>
-        <input id="prefix" name="prefix" type="text" value="{{.Prefix}}" maxlength="64" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="可选" {{if .BadPrefix}}aria-invalid="true" aria-errormessage="form-error"{{end}}>
+        <input id="prefix" name="prefix" type="text" value="{{.Prefix}}" maxlength="64" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="可选" aria-describedby="gen-hint" {{if .BadPrefix}}aria-invalid="true" aria-errormessage="form-error"{{end}}>
+      </div>
+      <div class="field">
+        <label for="length">位数</label>
+        <input id="length" name="length" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="{{.Length}}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="next" aria-describedby="gen-hint" {{if .BadLength}}aria-invalid="true" aria-errormessage="form-error"{{end}}>
       </div>
       <div class="field">
         <label for="count">数量</label>
-        <input id="count" name="count" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="{{.Count}}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
+        <input id="count" name="count" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="{{.Count}}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="done">
       </div>
     </div>
+    <p class="hint" id="gen-hint">不填前缀时按位数生成，4–16，默认 6。填写前缀时只建那一个地址。</p>
     <button type="submit">生成随机邮箱</button>
   </form>
 </section>

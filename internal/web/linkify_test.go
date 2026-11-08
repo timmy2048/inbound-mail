@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"laijian/internal/config"
+	"laijian/internal/generate"
 	"laijian/internal/parse"
 	"laijian/internal/store"
 )
@@ -102,7 +103,7 @@ func TestMessagePageAutolinksText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	boxes, err := st.CreateMailboxes(d.ID, 1, time.Now())
+	boxes, err := st.CreateMailboxes(d.ID, 1, generate.DefaultLocalPartLength, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

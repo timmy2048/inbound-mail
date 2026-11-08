@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"laijian/internal/generate"
 	"laijian/internal/rfc822"
 	"laijian/internal/store"
 )
@@ -24,7 +25,7 @@ func TestLookupAndStoreRaw(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	boxes, err := st.CreateMailboxes(d.ID, 1, now)
+	boxes, err := st.CreateMailboxes(d.ID, 1, generate.DefaultLocalPartLength, now)
 	if err != nil {
 		t.Fatal(err)
 	}

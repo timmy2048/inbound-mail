@@ -103,6 +103,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /admin/login", s.loginSubmit)
 	mux.HandleFunc("POST /admin/logout", s.requireAdmin(s.logout))
 	mux.HandleFunc("GET /admin", s.requireAdmin(s.domains))
+	mux.HandleFunc("GET /admin/ads", s.requireAdmin(s.ads))
+	mux.HandleFunc("POST /admin/ads", s.requireAdmin(s.saveAds))
 	mux.HandleFunc("POST /admin/domains", s.requireAdmin(s.createDomain))
 	mux.HandleFunc("GET /admin/domains/{id}", s.requireAdmin(s.domainPage))
 	mux.HandleFunc("POST /admin/domains/{id}/mailboxes", s.requireAdmin(s.generateMailboxes))
@@ -123,7 +125,9 @@ func (s *Server) secure(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+		// Mailbox pages replace this when an ad is configured. The framed
+		// message document always sets mailHTMLCSP itself.
+		w.Header().Set("Content-Security-Policy", pageCSP(""))
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 		if !strings.HasPrefix(r.URL.Path, "/static/") {
@@ -245,6 +249,7 @@ type Base struct {
 	Admin         bool
 	RetentionDays int
 	AttachmentMax string
+	Ad            AdSlot
 }
 
 func (s *Server) view(title string) Base {
@@ -274,6 +279,8 @@ func noticeFrom(r *http.Request) string {
 		return "已删除这个邮箱。之后发到该地址的信会被拒收。"
 	case "deleted-domain":
 		return "已删除这个域名，以及它下面的邮箱和邮件。"
+	case "saved-ad":
+		return "已保存广告设置。"
 	}
 	return ""
 }

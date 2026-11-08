@@ -164,15 +164,17 @@ type DomainView struct {
 	RFC       string
 	Mailboxes []MailboxRow
 	Count     string
+	Length    string
 	Prefix    string
 	BadPrefix bool
+	BadLength bool
 }
 
 func (s *Server) domainPage(w http.ResponseWriter, r *http.Request) {
-	s.renderDomain(w, r, "", "", "", http.StatusOK)
+	s.renderDomain(w, r, "", "", "", "", http.StatusOK)
 }
 
-func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, prefix, errMsg string, status int) {
+func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, length, prefix, errMsg string, status int) {
 	id, ok := pathID(r, "id")
 	if !ok {
 		s.notFound(w, r)
@@ -197,14 +199,19 @@ func (s *Server) renderDomain(w http.ResponseWriter, r *http.Request, count, pre
 	if count == "" {
 		count = "10"
 	}
+	if length == "" {
+		length = strconv.Itoa(generate.DefaultLocalPartLength)
+	}
 	view := DomainView{
 		Base:      s.adminView(d.Name, r),
 		Domain:    d,
 		Created:   displayTime(d.CreatedAt),
 		RFC:       rfc3339(d.CreatedAt),
 		Count:     count,
+		Length:    length,
 		Prefix:    prefix,
 		BadPrefix: strings.HasPrefix(errMsg, "前缀") || errMsg == "已存在",
+		BadLength: strings.HasPrefix(errMsg, "位数"),
 	}
 	view.Error = errMsg
 	view.Domain.MailboxCount = len(boxes)
@@ -231,9 +238,10 @@ func (s *Server) generateMailboxes(w http.ResponseWriter, r *http.Request) {
 	}
 	rawCount := r.FormValue("count")
 	rawPrefix := r.FormValue("prefix")
+	rawLength := formLength(r)
 	prefix, err := generate.NormalizePrefix(rawPrefix)
 	if err != nil {
-		s.renderDomain(w, r, rawCount, rawPrefix, "前缀格式不正确。", http.StatusBadRequest)
+		s.renderDomain(w, r, rawCount, rawLength, rawPrefix, "前缀格式不正确。", http.StatusBadRequest)
 		return
 	}
 	if prefix != "" {
@@ -241,33 +249,38 @@ func (s *Server) generateMailboxes(w http.ResponseWriter, r *http.Request) {
 			s.notFound(w, r)
 			return
 		} else if errors.Is(err, store.ErrExists) {
-			s.renderDomain(w, r, rawCount, prefix, "已存在", http.StatusConflict)
+			s.renderDomain(w, r, rawCount, rawLength, prefix, "已存在", http.StatusConflict)
 			return
 		} else if err != nil {
 			log.Printf("generate mailbox: %v", err)
-			s.renderDomain(w, r, rawCount, prefix, "暂时没能生成邮箱。", http.StatusInternalServerError)
+			s.renderDomain(w, r, rawCount, rawLength, prefix, "暂时没能生成邮箱。", http.StatusInternalServerError)
 			return
 		}
 		log.Printf("admin generated domain_id=%d prefix=%s", id, prefix)
 		http.Redirect(w, r, fmt.Sprintf("/admin/domains/%d?notice=generated&n=1", id), http.StatusSeeOther)
 		return
 	}
-	n, err := strconv.Atoi(rawCount)
+	n, err := strconv.Atoi(strings.TrimSpace(rawCount))
 	if err != nil || n < 1 || n > maxGenerate {
-		s.renderDomain(w, r, rawCount, "", fmt.Sprintf("数量请填写 1 到 %d 的整数。", maxGenerate), http.StatusBadRequest)
+		s.renderDomain(w, r, rawCount, rawLength, "", fmt.Sprintf("数量请填写 1 到 %d 的整数。", maxGenerate), http.StatusBadRequest)
 		return
 	}
-	boxes, err := s.store.CreateMailboxes(id, n, time.Now())
+	length, err := parseLocalLength(rawLength)
+	if err != nil {
+		s.renderDomain(w, r, rawCount, rawLength, "", "位数请填写 4 到 16 的整数。", http.StatusBadRequest)
+		return
+	}
+	boxes, err := s.store.CreateMailboxes(id, n, length, time.Now())
 	if errors.Is(err, store.ErrNotFound) {
 		s.notFound(w, r)
 		return
 	}
 	if err != nil {
 		log.Printf("generate mailboxes: %v", err)
-		s.renderDomain(w, r, rawCount, "", "暂时没能生成邮箱。", http.StatusInternalServerError)
+		s.renderDomain(w, r, rawCount, strconv.Itoa(length), "", "暂时没能生成邮箱。", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("admin generated domain_id=%d count=%d", id, len(boxes))
+	log.Printf("admin generated domain_id=%d count=%d length=%d", id, len(boxes), length)
 	http.Redirect(w, r, fmt.Sprintf("/admin/domains/%d?notice=generated&n=%d", id, len(boxes)), http.StatusSeeOther)
 }
 
@@ -281,7 +294,7 @@ func (s *Server) deleteDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.FormValue("ack") != "1" {
-		s.renderDomain(w, r, "", "", "删除域名需要勾选确认。", http.StatusBadRequest)
+		s.renderDomain(w, r, "", "", "", "删除域名需要勾选确认。", http.StatusBadRequest)
 		return
 	}
 	if err := s.store.DeleteDomain(id); errors.Is(err, store.ErrNotFound) {
@@ -378,4 +391,25 @@ func (s *Server) writeCSV(w http.ResponseWriter, domainID int64) {
 		})
 	}
 	cw.Flush()
+}
+
+// formLength reads the random local-part length. `digits` is accepted as an
+// alias when `length` is empty. A custom prefix ignores both.
+func formLength(r *http.Request) string {
+	if v := strings.TrimSpace(r.FormValue("length")); v != "" {
+		return v
+	}
+	return strings.TrimSpace(r.FormValue("digits"))
+}
+
+func parseLocalLength(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return generate.DefaultLocalPartLength, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || !generate.ValidLocalLength(n) {
+		return 0, generate.ErrInvalidLength
+	}
+	return n, nil
 }

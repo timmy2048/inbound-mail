@@ -174,7 +174,10 @@ func TestAdminInboxAndInboundSMTP(t *testing.T) {
 		t.Fatalf("generate status=%d body=%s", status, body)
 	}
 
-	addresses := regexp.MustCompile(`[a-z0-9]{10}@richrich\.cc\.cd`).FindAllString(body, -1)
+	if !strings.Contains(body, `name="length"`) || !strings.Contains(body, `value="6"`) {
+		t.Fatal("generate form missing default length 6")
+	}
+	addresses := regexp.MustCompile(`[a-z0-9]{6}@richrich\.cc\.cd`).FindAllString(body, -1)
 	uniq := map[string]bool{}
 	for _, addr := range addresses {
 		local, _, _ := strings.Cut(addr, "@")
@@ -340,6 +343,7 @@ func TestCustomPrefixMailbox(t *testing.T) {
 		"csrf":   {csrf},
 		"prefix": {"  Hello.World "},
 		"count":  {"4"},
+		"length": {"2"},
 	})
 	if status != http.StatusOK || !strings.Contains(body, "已生成 1 个邮箱") || !strings.Contains(body, "hello.world@richrich.cc.cd") {
 		t.Fatalf("prefix generate status=%d body=%s", status, body)
@@ -407,6 +411,153 @@ func TestCustomPrefixMailbox(t *testing.T) {
 	if status != http.StatusOK || !strings.Contains(inbox, "prefix-subject") {
 		t.Fatalf("inbox %d %s", status, inbox)
 	}
+}
+
+func TestLocalPartLengthChoice(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.Config{
+		HTTPAddr:           "127.0.0.1:0",
+		SMTPAddr:           "127.0.0.1:0",
+		SMTPDomain:         "localhost",
+		PublicBaseURL:      "http://127.0.0.1:8787",
+		AdminPassword:      "test-password-please",
+		RetentionDays:      3,
+		AttachmentMaxBytes: 64,
+		MessageMaxBytes:    1 << 20,
+		MailDataDir:        dir,
+		DatabasePath:       filepath.Join(dir, "mail.db"),
+		ServerPublicIP:     "203.0.113.10",
+	}
+	st, err := store.Open(cfg.DatabasePath, cfg.MailDataDir, cfg.AttachmentMaxBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	httpSrv, err := web.New(cfg, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	webSrv := httptest.NewServer(httpSrv.Handler())
+	t.Cleanup(webSrv.Close)
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar}
+	status, body := postForm(t, client, webSrv.URL+"/admin/login", url.Values{
+		"username": {"admin"},
+		"password": {"test-password-please"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("login %d", status)
+	}
+	csrf := mustCSRF(t, body)
+	status, body = postForm(t, client, webSrv.URL+"/admin/domains", url.Values{
+		"csrf":   {csrf},
+		"domain": {"richrich.cc.cd"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("domain %d %s", status, body)
+	}
+	if !strings.Contains(body, `id="length"`) || !strings.Contains(body, `value="6"`) {
+		t.Fatal("missing default length")
+	}
+	csrf = mustCSRF(t, body)
+	domainURL := webSrv.URL + regexp.MustCompile(`/admin/domains/\d+`).FindString(body)
+
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"count":  {"3"},
+		"length": {"8"},
+	})
+	if status != http.StatusOK || !strings.Contains(body, "已生成 3 个邮箱") {
+		t.Fatalf("length 8 status=%d body=%s", status, body)
+	}
+	if locals := localParts(t, body); len(locals) != 3 || !sameLen(locals, 8) {
+		t.Fatalf("length 8 locals=%v", locals)
+	}
+
+	csrf = mustCSRF(t, body)
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"count":  {"2"},
+		"digits": {"4"},
+	})
+	if status != http.StatusOK || !strings.Contains(body, "已生成 2 个邮箱") {
+		t.Fatalf("digits status=%d body=%s", status, body)
+	}
+	locals := localParts(t, body)
+	if len(locals) != 5 || countLen(locals, 4) != 2 || countLen(locals, 8) != 3 {
+		t.Fatalf("digits locals=%v", locals)
+	}
+
+	csrf = mustCSRF(t, body)
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"count":  {"1"},
+		"length": {"3"},
+	})
+	if status != http.StatusBadRequest || !strings.Contains(body, "位数请填写 4 到 16 的整数。") {
+		t.Fatalf("short status=%d body=%s", status, body)
+	}
+	if locals := localParts(t, body); len(locals) != 5 {
+		t.Fatalf("short length inserted %v", locals)
+	}
+
+	csrf = mustCSRF(t, body)
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"count":  {"1"},
+		"length": {"17"},
+		"digits": {"6"},
+	})
+	if status != http.StatusBadRequest || !strings.Contains(body, "位数请填写 4 到 16 的整数。") {
+		t.Fatalf("length wins over digits status=%d body=%s", status, body)
+	}
+
+	csrf = mustCSRF(t, body)
+	status, body = postForm(t, client, domainURL+"/mailboxes", url.Values{
+		"csrf":   {csrf},
+		"prefix": {"solo"},
+		"count":  {"9"},
+		"length": {"16"},
+	})
+	if status != http.StatusOK || !strings.Contains(body, "已生成 1 个邮箱") || !strings.Contains(body, "solo@richrich.cc.cd") {
+		t.Fatalf("prefix ignores length status=%d body=%s", status, body)
+	}
+	locals = localParts(t, body)
+	if len(locals) != 6 || countLen(locals, 16) != 0 {
+		t.Fatalf("prefix still random: %v", locals)
+	}
+}
+
+func localParts(t *testing.T, body string) []string {
+	t.Helper()
+	matches := regexp.MustCompile(`>([a-z0-9]+)@richrich\.cc\.cd<`).FindAllStringSubmatch(body, -1)
+	out := make([]string, 0, len(matches))
+	for _, m := range matches {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+func sameLen(parts []string, n int) bool {
+	for _, p := range parts {
+		if len(p) != n {
+			return false
+		}
+	}
+	return true
+}
+
+func countLen(parts []string, n int) int {
+	c := 0
+	for _, p := range parts {
+		if len(p) == n {
+			c++
+		}
+	}
+	return c
 }
 
 func get(t *testing.T, c *http.Client, rawURL string) (int, string) {

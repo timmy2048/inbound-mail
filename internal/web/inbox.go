@@ -40,8 +40,10 @@ func (s *Server) inbox(w http.ResponseWriter, r *http.Request) {
 		s.problem(w, http.StatusInternalServerError, "暂时没能读出信件。")
 		return
 	}
+	base := s.view(mb.Address)
+	base.Ad = s.publicAd(w)
 	view := InboxView{
-		Base:    s.view(mb.Address),
+		Base:    base,
 		Address: mb.Address,
 		Token:   mb.Token,
 	}
@@ -96,8 +98,10 @@ func (s *Server) message(w http.ResponseWriter, r *http.Request) {
 		s.problem(w, http.StatusInternalServerError, "暂时没能读出附件。")
 		return
 	}
+	base := s.view(showSubject(msg.Subject))
+	base.Ad = s.publicAd(w)
 	view := MessageView{
-		Base:        s.view(showSubject(msg.Subject)),
+		Base:        base,
 		Address:     mb.Address,
 		Token:       mb.Token,
 		Sender:      msg.Sender,

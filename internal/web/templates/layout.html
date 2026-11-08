@@ -23,6 +23,7 @@
   {{if .Admin}}
   <nav aria-label="后台">
     <a href="/admin">域名</a>
+    <a href="/admin/ads">广告</a>
     <a href="/admin/mailboxes.csv">导出 CSV</a>
     <form method="post" action="/admin/logout">
       <input type="hidden" name="csrf" value="{{.CSRF}}">
@@ -45,7 +46,31 @@
 <footer class="colophon">
   <p>来件只接收已生成的地址，不向外发信。信件保留 {{.RetentionDays}} 天，单个附件超过 {{.AttachmentMax}} 时只保存前面那一段。</p>
 </footer>
+{{template "ad" .}}
 <script src="/static/app.js"></script>
 </body>
 </html>
+{{end}}
+
+{{define "ad"}}
+{{if .Ad.Show}}
+<aside class="ad-slot" aria-label="广告">
+  <div class="ad-card">
+    {{if or .Ad.Title .Ad.Description}}
+    <div class="ad-copy">
+      {{if .Ad.Title}}<p class="ad-title">{{.Ad.Title}}</p>{{end}}
+      {{if .Ad.Description}}<p class="ad-note">{{.Ad.Description}}</p>{{end}}
+    </div>
+    {{end}}
+    {{if .Ad.ImageURL}}
+    <figure class="ad-figure">
+      {{if .Ad.LinkURL}}<a class="ad-link" href="{{.Ad.LinkURL}}" target="_blank" rel="sponsored noopener noreferrer">{{end}}
+      <img src="{{.Ad.ImageURL}}" alt="{{if .Ad.Title}}{{.Ad.Title}}{{else}}广告{{end}}" decoding="async" loading="lazy" fetchpriority="low">
+      {{if .Ad.LinkURL}}</a>{{end}}
+    </figure>
+    {{end}}
+    {{if .Ad.HTML}}<div class="ad-code">{{.Ad.HTML}}</div>{{end}}
+  </div>
+</aside>
+{{end}}
 {{end}}

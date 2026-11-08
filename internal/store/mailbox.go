@@ -140,10 +140,14 @@ func (s *Store) CreateMailbox(domainID int64, local string, now time.Time) (Mail
 }
 
 // CreateMailboxes allocates n random addresses on a domain.
-// Each address gets one permanent token. Collisions are retried.
-func (s *Store) CreateMailboxes(domainID int64, n int, now time.Time) ([]Mailbox, error) {
+// length is the local-part size (4–16). Each address gets one permanent
+// token. Collisions are retried.
+func (s *Store) CreateMailboxes(domainID int64, n, length int, now time.Time) ([]Mailbox, error) {
 	if n < 1 || n > maxGenerate {
 		return nil, fmt.Errorf("count must be 1..%d", maxGenerate)
+	}
+	if !generate.ValidLocalLength(length) {
+		return nil, generate.ErrInvalidLength
 	}
 	domain, err := s.Domain(domainID)
 	if err != nil {
@@ -161,7 +165,7 @@ func (s *Store) CreateMailboxes(domainID int64, n int, now time.Time) ([]Mailbox
 		var mb Mailbox
 		var lastErr error
 		for attempt := 0; attempt < 8; attempt++ {
-			local, err := generate.RandomLocalPart()
+			local, err := generate.RandomLocalPartN(length)
 			if err != nil {
 				return nil, err
 			}

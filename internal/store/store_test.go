@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +29,7 @@ func TestCreateMailboxesFormatAndRetention(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	boxes, err := st.CreateMailboxes(d.ID, 5, now)
+	boxes, err := st.CreateMailboxes(d.ID, 5, generate.DefaultLocalPartLength, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,6 +171,89 @@ func TestCreateMailboxPrefixAndDuplicate(t *testing.T) {
 	}
 	if len(all) != 2 {
 		t.Fatalf("all %+v", all)
+	}
+}
+
+func TestCreateMailboxesLength(t *testing.T) {
+	st := openTest(t, 32)
+	now := time.Date(2026, 11, 8, 1, 0, 0, 0, time.UTC)
+	d, err := st.CreateDomain("richrich.cc.cd", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	boxes, err := st.CreateMailboxes(d.ID, 3, 8, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boxes) != 3 {
+		t.Fatalf("got %d", len(boxes))
+	}
+	seen := map[string]bool{}
+	for _, mb := range boxes {
+		if !generate.ValidLocalPartN(mb.LocalPart, 8) {
+			t.Fatalf("local %q", mb.LocalPart)
+		}
+		if seen[mb.LocalPart] {
+			t.Fatalf("duplicate %s", mb.LocalPart)
+		}
+		seen[mb.LocalPart] = true
+	}
+	if _, err := st.CreateMailboxes(d.ID, 1, 3, now); !errors.Is(err, generate.ErrInvalidLength) {
+		t.Fatalf("short length err=%v", err)
+	}
+	if _, err := st.CreateMailboxes(d.ID, 1, 17, now); !errors.Is(err, generate.ErrInvalidLength) {
+		t.Fatalf("long length err=%v", err)
+	}
+	left, err := st.ListMailboxes(d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 3 {
+		t.Fatalf("rejected length still inserted: %+v", left)
+	}
+}
+
+func TestAdSettingsRoundTrip(t *testing.T) {
+	st := openTest(t, 32)
+	got, err := st.GetAdSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Enabled || got.ImageURL != "" || got.LinkURL != "" || got.Title != "" || got.Description != "" || got.HTML != "" {
+		t.Fatalf("default %+v", got)
+	}
+	want := AdSettings{
+		Enabled:     true,
+		ImageURL:    "https://cdn.example.com/banner.png",
+		LinkURL:     "https://example.com/go",
+		Title:       "合作",
+		Description: "说明",
+		HTML:        `<script>ads()</script>`,
+	}
+	if err := st.SaveAdSettings(want); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveAdSettings(want); err != nil {
+		t.Fatal(err)
+	}
+	got, err = st.GetAdSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("got %+v", got)
+	}
+	want.Enabled = false
+	want.HTML = ""
+	if err := st.SaveAdSettings(want); err != nil {
+		t.Fatal(err)
+	}
+	got, err = st.GetAdSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Enabled || got.HTML != "" || got.ImageURL != want.ImageURL {
+		t.Fatalf("updated %+v", got)
 	}
 }
 
