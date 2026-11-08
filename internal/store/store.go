@@ -63,9 +63,9 @@ type Attachment struct {
 
 // Store is the SQLite database and the attachment directory.
 type Store struct {
-	db             *sql.DB
-	dataDir        string
-	attachmentMax  int64
+	db            *sql.DB
+	dataDir       string
+	attachmentMax int64
 }
 
 // Open creates the data directory, the database, and the schema.
@@ -176,6 +176,18 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+CREATE TABLE IF NOT EXISTS ad_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0,
+    image_url TEXT NOT NULL DEFAULT '',
+    link_url TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    html TEXT NOT NULL DEFAULT ''
+);
+
+INSERT OR IGNORE INTO ad_settings (id) VALUES (1);
 `
 
 func isUnique(err error) bool {

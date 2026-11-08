@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"laijian/internal/config"
+	"laijian/internal/generate"
 	"laijian/internal/rfc822"
 	"laijian/internal/store"
 )
@@ -239,7 +240,7 @@ func openIngest(t *testing.T, token string, messageMax, attachmentMax int64) (*s
 	if err != nil {
 		t.Fatal(err)
 	}
-	boxes, err := st.CreateMailboxes(d.ID, 1, now)
+	boxes, err := st.CreateMailboxes(d.ID, 1, generate.DefaultLocalPartLength, now)
 	if err != nil {
 		t.Fatal(err)
 	}

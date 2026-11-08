@@ -224,15 +224,15 @@
   .field { margin: 0 0 1rem; }
   .split {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(7.5rem, 0.7fr);
+    grid-template-columns: minmax(0, 1.6fr) minmax(5.5rem, 0.45fr) minmax(5.5rem, 0.45fr);
     gap: 0.75rem 1rem;
-    max-width: 40rem;
+    max-width: 46rem;
   }
   .split .field { margin: 0; }
 
   label { display: block; font-weight: 650; margin-bottom: 0.35rem; }
 
-  input[type="text"], input[type="password"] {
+  input[type="text"], input[type="password"], textarea {
     width: 100%;
     min-height: 48px;
     padding: 0.55rem 0.75rem;
@@ -243,10 +243,21 @@
     font-size: 1rem;
   }
 
-  input::placeholder { color: var(--muted); opacity: 1; }
+  textarea {
+    display: block;
+    min-height: 12rem;
+    resize: vertical;
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  .field.compact input { max-width: 42rem; }
+
+  input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
   input[readonly] { background: var(--paper-2); }
-  input:user-invalid,
-  input[aria-invalid="true"] {
+  input:user-invalid, textarea:user-invalid,
+  input[aria-invalid="true"], textarea[aria-invalid="true"] {
     border-color: var(--danger);
     background: var(--danger-bg);
   }
@@ -290,7 +301,9 @@
   button:disabled { cursor: progress; opacity: 0.7; }
 
   form[action="/admin/login"] button[type="submit"] { width: 100%; }
-  form .split + button { margin-top: 0.9rem; }
+  form .split + button,
+  form .split + .hint + button { margin-top: 0.9rem; }
+  form .split + .hint { margin: 0.7rem 0 0; max-width: 46rem; }
 
   .check {
     display: flex;
@@ -464,6 +477,45 @@
     background: white;
   }
 
+  .colophon:has(+ .ad-slot) { margin-bottom: 0.85rem; }
+
+  .ad-slot {
+    width: min(960px, calc(100% - 2rem));
+    margin: 0 auto 2.5rem;
+  }
+
+  .ad-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 1rem;
+  }
+
+  .ad-copy { margin-bottom: 0.75rem; }
+  .ad-title { margin: 0; font-weight: 650; }
+  .ad-note { margin: 0.2rem 0 0; color: var(--muted); }
+
+  .ad-figure {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .ad-link { display: block; max-width: 100%; }
+  .ad-card img {
+    display: block;
+    width: auto;
+    height: min(12rem, 32vh);
+    max-width: min(100%, 36rem);
+    object-fit: contain;
+    margin-inline: auto;
+    border-radius: 12px;
+  }
+
+  .ad-code { min-width: 0; }
+  .ad-card > .ad-code:not(:first-child) { margin-top: 0.85rem; }
+  .ad-code :is(img, iframe, video) { max-width: 100%; }
+
   @container (width < 720px) {
     .table-wrap table,
     .table-wrap tbody,
@@ -524,6 +576,7 @@
     }
     .meta { grid-template-columns: 1fr; gap: 0.1rem 0; }
     .meta dt { margin-top: 0.55rem; }
+    .ad-card { padding: 0.85rem; border-radius: 14px; }
   }
 
   @media (pointer: coarse) {

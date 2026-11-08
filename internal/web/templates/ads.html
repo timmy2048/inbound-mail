@@ -1,0 +1,33 @@
+{{define "ads"}}
+{{template "head" .}}
+<h1>广告设置</h1>
+<form method="post" action="/admin/ads">
+  <input type="hidden" name="csrf" value="{{.CSRF}}">
+  <label class="check">
+    <input type="checkbox" name="enabled" value="1" {{if .Enabled}}checked{{end}}>
+    <span>在收件页显示广告</span>
+  </label>
+  <div class="field compact">
+    <label for="image_url">图片 URL</label>
+    <input id="image_url" name="image_url" type="text" inputmode="url" value="{{.ImageURL}}" maxlength="2048" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="https://cdn.example.com/banner.png">
+  </div>
+  <div class="field compact">
+    <label for="link_url">点击链接</label>
+    <input id="link_url" name="link_url" type="text" inputmode="url" value="{{.LinkURL}}" maxlength="2048" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="https://example.com">
+  </div>
+  <div class="field compact">
+    <label for="ad_title">标题</label>
+    <input id="ad_title" name="title" type="text" value="{{.Title}}" maxlength="80" autocomplete="off">
+  </div>
+  <div class="field compact">
+    <label for="ad_description">说明</label>
+    <input id="ad_description" name="description" type="text" value="{{.Description}}" maxlength="200" autocomplete="off">
+  </div>
+  <div class="field">
+    <label for="html">第三方代码</label>
+    <textarea id="html" name="html" rows="8" maxlength="32768" spellcheck="false" autocapitalize="off" autocorrect="off">{{.HTML}}</textarea>
+  </div>
+  <button type="submit">保存</button>
+</form>
+{{template "foot" .}}
+{{end}}

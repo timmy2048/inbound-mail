@@ -9,14 +9,34 @@ import (
 )
 
 const (
-	Alphabet        = "abcdefghijklmnopqrstuvwxyz0123456789"
-	LocalPartLength = 10
+	Alphabet               = "abcdefghijklmnopqrstuvwxyz0123456789"
+	MinLocalPartLength     = 4
+	MaxLocalPartLength     = 16
+	DefaultLocalPartLength = 6
+	// LocalPartLength is the default random local-part length.
+	LocalPartLength = DefaultLocalPartLength
 )
 
-// RandomLocalPart returns a fixed-length mailbox local part.
+// ErrInvalidLength means a requested random local-part length is outside 4–16.
+var ErrInvalidLength = errors.New("invalid length")
+
+// ValidLocalLength reports whether n is an allowed random local-part length.
+func ValidLocalLength(n int) bool {
+	return n >= MinLocalPartLength && n <= MaxLocalPartLength
+}
+
+// RandomLocalPart returns a default-length mailbox local part.
 // The alphabet is lowercase a-z and digits 0-9, chosen without modulo bias.
 func RandomLocalPart() (string, error) {
-	return randomFrom(Alphabet, LocalPartLength)
+	return RandomLocalPartN(DefaultLocalPartLength)
+}
+
+// RandomLocalPartN returns a random local part of length n.
+func RandomLocalPartN(n int) (string, error) {
+	if !ValidLocalLength(n) {
+		return "", ErrInvalidLength
+	}
+	return randomFrom(Alphabet, n)
 }
 
 // RandomToken returns an unguessable URL token.
@@ -31,9 +51,14 @@ func RandomToken() (string, error) {
 // ErrInvalidPrefix means a custom local part failed the prefix rules.
 var ErrInvalidPrefix = errors.New("invalid prefix")
 
-// ValidLocalPart reports whether s is a random 10-character local part.
+// ValidLocalPart reports whether s is a default-length random local part.
 func ValidLocalPart(s string) bool {
-	if len(s) != LocalPartLength {
+	return ValidLocalPartN(s, DefaultLocalPartLength)
+}
+
+// ValidLocalPartN reports whether s is a random local part of length n.
+func ValidLocalPartN(s string, n int) bool {
+	if !ValidLocalLength(n) || len(s) != n {
 		return false
 	}
 	for i := 0; i < len(s); i++ {
